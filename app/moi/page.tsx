@@ -1,7 +1,8 @@
 "use client";
 import { ArrowLeft, ArrowRight, Camera, Check, CheckCircle2, ChevronRight, FileUp, LocateFixed, MapPin, Printer, Search } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { chargerParLien } from "@/lib/sync";
 import { QR, useQuery } from "@/components/commun";
 import { MapView } from "@/components/MapView";
 import { BandeauDemo, Outils } from "@/components/Shell";
@@ -30,7 +31,14 @@ export default function Moi() {
   const [q, setQ] = useState("");
   const [edition, setEdition] = useState(false);
   const jeton = q0.get("t");
+  const [chargement, setChargement] = useState(SUPABASE_ACTIF && !!jeton);
+  useEffect(() => {
+    // En production, l'élève n'a pas de compte : son lien personnel ouvre son seul dossier.
+    if (SUPABASE_ACTIF && jeton) void chargerParLien(jeton).finally(() => setChargement(false));
+  }, [jeton]);
   const c = jeton ? db.candidats.find((x) => x.token === jeton) : db.candidats.find((x) => x.id === moiId);
+
+  if (chargement) return <Cadre><p className="py-24 text-center text-sm text-muted">Chargement de ton dossier…</p></Cadre>;
 
   if (!c)
     return (

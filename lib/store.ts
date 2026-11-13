@@ -26,6 +26,7 @@ interface Etat {
   etape: number;
   role: Role | null;
   moiId: string | null; // candidat incarné dans l'espace candidat
+  jeton: string | null; // lien personnel de l'élève (mode Supabase, sans compte)
   agenceId: string | null; // agence incarnée par le chef d'agence
   cohorteId: string; // cohorte affichée, ou « toutes »
   province: string; // province affichée, ou "" pour toutes
@@ -38,7 +39,7 @@ interface Etat {
   del: (table: Table, ids: string[]) => void;
   charger: (db: DB) => void;
   reinitialiser: (etape: number) => void;
-  set: (p: Partial<Pick<Etat, "role" | "moiId" | "agenceId" | "cohorteId" | "province" | "theme" | "ficheId" | "outbox" | "derniereSync" | "boiteOuverte" | "pret">>) => void;
+  set: (p: Partial<Pick<Etat, "role" | "moiId" | "jeton" | "agenceId" | "cohorteId" | "province" | "theme" | "ficheId" | "outbox" | "derniereSync" | "boiteOuverte" | "pret">>) => void;
 }
 
 export const useStore = create<Etat>()(
@@ -49,6 +50,7 @@ export const useStore = create<Etat>()(
       etape: 5,
       role: null,
       moiId: null,
+      jeton: null,
       agenceId: null,
       cohorteId: TOUTES,
       province: "",
@@ -86,7 +88,7 @@ export const useStore = create<Etat>()(
     {
       name: "elp-hub-v2",
       skipHydration: true, // réhydraté après le montage pour éviter tout écart avec le rendu serveur
-      partialize: (s) => ({ db: s.db, etape: s.etape, role: s.role, moiId: s.moiId, agenceId: s.agenceId, cohorteId: s.cohorteId, province: s.province, theme: s.theme, outbox: s.outbox, derniereSync: s.derniereSync }),
+      partialize: (s) => ({ db: s.db, etape: s.etape, role: s.role, moiId: s.moiId, jeton: s.jeton, agenceId: s.agenceId, cohorteId: s.cohorteId, province: s.province, theme: s.theme, outbox: s.outbox, derniereSync: s.derniereSync }),
       onRehydrateStorage: () => (state) => {
         // Premier lancement en mode démo : on génère les cohortes fictives.
         if (state && !SUPABASE_ACTIF && state.db.candidats.length === 0) state.reinitialiser(5);
