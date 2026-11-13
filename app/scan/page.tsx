@@ -105,7 +105,7 @@ export default function Scan() {
         </header>
 
         <div className="flex rounded-xl bg-white/10 p-1">
-          {(["test", "induction"] as const).map((k) => <button key={k} aria-pressed={contexte === k} onClick={() => { setContexte(k); setRes(null); }} className={cx("flex-1 rounded-lg py-2 text-sm font-bold", contexte === k ? "bg-white text-ink" : "text-white/70")}>{k === "test" ? "Entrée au test" : "Présence induction"}</button>)}
+          {(["test", "induction"] as const).map((k) => <button key={k} aria-pressed={contexte === k} onClick={() => { setContexte(k); setRes(null); }} className={cx("flex-1 rounded-lg py-2 text-sm font-bold", contexte === k ? "bg-surface text-ink" : "text-white/70")}>{k === "test" ? "Entrée au test" : "Présence induction"}</button>)}
         </div>
 
         <div className="relative mt-4 aspect-square overflow-hidden rounded-3xl bg-black/50 ring-1 ring-white/15">

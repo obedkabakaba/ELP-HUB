@@ -1,8 +1,8 @@
 // Service worker ELP Hub : l'application s'ouvre même sans connexion.
 // - Pages : réseau d'abord, copie en cache en secours.
 // - Fichiers statiques (JS, CSS, images, polices) : cache d'abord.
-const CACHE = "elp-hub-v1";
-const PAGES = ["/", "/tableau", "/candidats", "/moi", "/scan", "/agence", "/carte"];
+const CACHE = "elp-hub-v2";
+const PAGES = ["/", "/tableau", "/candidats", "/moi", "/scan", "/agence", "/carte", "/chapitres", "/cohortes"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(PAGES).catch(() => {})));

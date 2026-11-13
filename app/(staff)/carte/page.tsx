@@ -5,7 +5,8 @@ import { MapView, esc, type Point } from "@/components/MapView";
 import { Card, Entete, cx } from "@/components/ui";
 import { position } from "@/lib/geo";
 import { nomComplet } from "@/lib/logic";
-import { useStore } from "@/lib/store";
+import { useStore, useVue } from "@/lib/store";
+import { PROVINCES } from "@/lib/geo";
 import { STATUTS, statutInfo, type Statut } from "@/lib/types";
 
 function Case({ label, coche, onChange }: { label: string; coche: boolean; onChange: (v: boolean) => void }) {
@@ -19,9 +20,11 @@ function Case({ label, coche, onChange }: { label: string; coche: boolean; onCha
 
 export default function Carte() {
   const q0 = useQuery();
-  const db = useStore((s) => s.db);
+  const db = useVue();
+  const province = useStore((s) => s.province);
+  const ville = PROVINCES.find((p) => p.nom === (province || "Kinshasa"));
   const [couches, setCouches] = useState({ eleves: true, agences: true, centres: true, chaleur: false, liens: q0.get("liens") === "1" });
-  const [masques, setMasques] = useState<Set<Statut>>(new Set(["non_retenu", "desiste"]));
+  const [masques, setMasques] = useState<Set<Statut>>(new Set(["non_retenu", "desiste", "exclu"]));
 
   const { points, lignes, chaleur, communes, sansGps } = useMemo(() => {
     const pts: Point[] = [];
@@ -66,10 +69,10 @@ export default function Carte() {
 
   return (
     <>
-      <Entete titre="Carte" sous="Tous les ELP, les agences, les centres de test et l'hôtel sur une seule carte de Kinshasa." />
+      <Entete titre="Carte" sous="Les ELP, les agences, les centres de test et l'hôtel. Choisissez une province en haut de l'écran pour y centrer la carte." />
       <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
         <Card className="overflow-hidden p-1.5">
-          <MapView points={points} lignes={lignes} chaleur={chaleur} className="h-[70vh] min-h-[440px] w-full rounded-xl" />
+          <MapView centre={ville ? [ville.lat, ville.lng] : undefined} zoom={ville?.zoom} points={points} lignes={lignes} chaleur={chaleur} className="h-[70vh] min-h-[440px] w-full rounded-xl" />
         </Card>
         <div className="space-y-4">
           <Card className="space-y-3 p-5">

@@ -6,13 +6,34 @@ import { Btn, Card, Chiffre, Entete, Pastille, cx, toast } from "@/components/ui
 import { actionsDuJour } from "@/lib/actions";
 import { completude } from "@/lib/logic";
 import { fmtDate, fmtQuand } from "@/lib/modeles";
-import { acteurCourant, useStore } from "@/lib/store";
+import { TOUTES, acteurCourant, useStore, useVue } from "@/lib/store";
+import { ETAPES as ETAPES_ELP, statutInfo } from "@/lib/types";
 
 const URGENCE = { 1: { l: "Aujourd'hui", ton: "rouge" as const }, 2: { l: "Cette semaine", ton: "ambre" as const }, 3: { l: "À surveiller", ton: "gris" as const } };
 
 export default function Tableau() {
-  const db = useStore((s) => s.db);
+  const db = useVue();
   const [faits, setFaits] = useState<string[]>([]);
+  const tout = useStore((s) => s.db);
+  const cohorteId = useStore((s) => s.cohorteId);
+  const set = useStore((s) => s.set);
+  // Toutes les cohortes restent suivies en parallèle : où en est chacune ?
+  const pivot = useMemo(() => tout.cohortes.slice().sort((a, b) => b.annee - a.annee).map((k) => {
+    const l = db.candidats.filter((c) => c.cohorte_id === k.id);
+    const etape = Math.max(1, ...l.filter((c) => !["non_retenu", "desiste", "exclu"].includes(c.statut)).map((c) => statutInfo(c.statut).etape));
+    return { k, n: l.length, etape, retenus: l.filter((c) => ["selectionne", "induction", "stage", "termine"].includes(c.statut)).length, stage: l.filter((c) => c.statut === "stage").length };
+  }).filter((x) => x.n), [tout.cohortes, db.candidats]);
+  const provinces = useMemo(() => {
+    const m = new Map<string, { total: number; parcours: number; stage: number }>();
+    for (const c of db.candidats) {
+      const x = m.get(c.province) ?? { total: 0, parcours: 0, stage: 0 };
+      x.total++;
+      if (!["non_retenu", "desiste", "exclu", "termine"].includes(c.statut)) x.parcours++;
+      if (c.statut === "stage") x.stage++;
+      m.set(c.province, x);
+    }
+    return [...m.entries()].sort((a, b) => b[1].total - a[1].total);
+  }, [db.candidats]);
   const actions = useMemo(() => actionsDuJour(db), [db]);
 
   const s = useMemo(() => {
@@ -22,7 +43,7 @@ export default function Tableau() {
     const convoques = new Set(db.convocations.map((k) => k.candidat_id));
     const testes = new Set(db.notes.map((n) => n.candidat_id));
     const elus = c.filter((x) => ["selectionne", "induction", "stage", "termine"].includes(x.statut));
-    const sortants = db.messages.filter((m) => m.modele !== "reponse");
+    const sortants = db.messages;
     const livres = sortants.filter((m) => m.statut === "livre" || m.statut === "lu").length;
     return {
       total: c.length,
@@ -36,6 +57,7 @@ export default function Tableau() {
         { l: "Sélectionnés", n: elus.length },
         { l: "Induction", n: c.filter((x) => ["induction", "stage", "termine"].includes(x.statut)).length },
         { l: "En stage", n: c.filter((x) => ["stage", "termine"].includes(x.statut)).length },
+        { l: "Terminés", n: c.filter((x) => x.statut === "termine").length },
       ],
       filles: elus.filter((x) => x.sexe === "F").length,
       elus: elus.length,
@@ -64,16 +86,32 @@ export default function Tableau() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Chiffre accent label="Présélectionnés" valeur={s.total} detail="Élèves à 80 % et plus à l'Exetat" />
         <Chiffre label="Inscrits" valeur={<>{s.inscrits} <span className="text-base font-bold text-muted">· {Math.round((s.inscrits / Math.max(1, s.total)) * 100)} %</span></>} detail={`${s.complets} dossiers complets`} />
-        <Chiffre label="Parité des sélectionnés" valeur={s.elus ? <>{s.filles} F <span className="text-muted">·</span> {s.elus - s.filles} G</> : "—"} detail={s.elus ? `${s.elus} sélectionnés au total` : "Sélection pas encore faite"} />
-        <Chiffre label="Messages remis" valeur={`${s.livraison} %`} detail={`${s.messages} messages envoyés`} />
+        <Chiffre label="Filles et garçons retenus" valeur={s.elus ? <>{s.filles} F <span className="text-muted">·</span> {s.elus - s.filles} G</> : "—"} detail={s.elus ? `${s.elus} sélectionnés au total` : "Sélection pas encore faite"} />
+        <Chiffre label="E-mails remis" valeur={`${s.livraison} %`} detail={`${s.messages} e-mails envoyés`} />
       </div>
+
+      {cohorteId === TOUTES && pivot.length > 1 && (
+        <Card className="mt-4 p-5 sm:p-6">
+          <h2 className="mb-4 font-bold">Toutes les cohortes, en parallèle</h2>
+          <div className="grid gap-3 md:grid-cols-3">
+            {pivot.map(({ k, n, etape, retenus, stage }) => (
+              <button key={k.id} onClick={() => set({ cohorteId: k.id })} className="rounded-2xl border border-sand-200 p-4 text-left transition hover:border-brand-300 hover:bg-sand-100">
+                <div className="flex items-baseline justify-between"><p className="text-lg font-extrabold">{k.nom}</p><p className="tabular text-sm text-muted">{n} élèves</p></div>
+                <p className="mt-1 text-xs font-bold text-brand-600">Étape {etape} · {ETAPES_ELP[etape - 1].titre}</p>
+                <div className="mt-2 flex gap-0.5">{ETAPES_ELP.map((e) => <span key={e.n} className={`h-1.5 flex-1 rounded-full ${e.n <= etape ? "bg-brand-600" : "bg-sand-200"}`} />)}</div>
+                <p className="mt-2 text-xs text-muted">{retenus} retenus{stage ? ` · ${stage} en stage` : ""}</p>
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <Card className="mt-4 p-5 sm:p-6">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-bold">Parcours de la cohorte</h2>
+          <h2 className="font-bold">{cohorteId === TOUTES ? "Parcours, toutes cohortes confondues" : "Parcours de la cohorte"}</h2>
           <Link href="/candidats?vue=kanban" className="flex items-center gap-1 text-xs font-bold text-brand-600">Vue Kanban <ArrowRight className="size-3.5" /></Link>
         </div>
-        <div className="grid grid-cols-7 items-end gap-1.5 sm:gap-3">
+        <div className="grid grid-cols-8 items-end gap-1.5 sm:gap-3">
           {s.etapes.map((e, i) => (
             <div key={e.l} className="min-w-0">
               <div className="flex h-28 items-end">
@@ -135,6 +173,21 @@ export default function Tableau() {
                 <p className="text-xs font-semibold text-muted">{echeance.l}</p>
                 <p className="font-bold first-letter:uppercase">{fmtDate(echeance.d)}</p>
               </div>
+            </Card>
+          )}
+          {provinces.length > 1 && (
+            <Card className="p-5">
+              <h2 className="mb-3 font-bold">Par province</h2>
+              <ul className="space-y-2.5">
+                {provinces.map(([p, x]) => (
+                  <li key={p}>
+                    <button className="w-full text-left text-[13px]" onClick={() => set({ province: p })}>
+                      <div className="flex justify-between font-semibold"><span>{p}</span><span className="tabular text-muted">{x.parcours} en parcours{x.stage ? ` · ${x.stage} en stage` : ""}</span></div>
+                      <div className="mt-1 h-1.5 rounded-full bg-sand-200"><div className="h-full rounded-full bg-brand-500" style={{ width: `${(x.total / provinces[0][1].total) * 100}%` }} /></div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </Card>
           )}
           <Card className="p-5">

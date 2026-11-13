@@ -27,7 +27,7 @@ async function lireTout(sb: SupabaseClient, table: Table): Promise<unknown[]> {
 // Le centre de test et le chef d'agence n'ont pas accès aux dossiers complets :
 // ils lisent une vue réduite, complétée ici par des valeurs vides.
 const VUES: Partial<Record<Role, string>> = { centre: "candidats_centre", agence: "candidats_agence" };
-const CANDIDAT_VIDE = { postnom: "", date_naissance: null, telephone: "", email: null, ecole: "", section: "", pourcentage_exetat: 0, commune: "", adresse: "", lat: null, lng: null, parent_nom: "", parent_lien: "", parent_telephone: "", parent_token: "", token: "", allergies: "", urgence_nom: "", urgence_telephone: "", consentement_le: null, invite_le: null, inscrit_le: null, derniere_activite: null, relances: 0, telephone_invalide: false, chambre: null, compte_ouvert: false, note_interne: "", anonymise: false, rang_attente: null };
+const CANDIDAT_VIDE = { postnom: "", date_naissance: null, telephone: "", email: null, ecole: "", section: "", pourcentage_exetat: 0, commune: "", adresse: "", lat: null, lng: null, parent_nom: "", parent_lien: "", parent_telephone: "", parent_token: "", token: "", allergies: "", urgence_nom: "", urgence_telephone: "", consentement_le: null, invite_le: null, inscrit_le: null, derniere_activite: null, relances: 0, contact_invalide: false, motif_sortie: "", sorti_le: null, universite: "", chapitre_id: null, parent_email: "", chambre: null, compte_ouvert: false, note_interne: "", anonymise: false, rang_attente: null };
 
 /** Récupère toutes les tables visibles pour le rôle connecté (filtrage par RLS côté serveur). */
 export async function tirer(): Promise<void> {

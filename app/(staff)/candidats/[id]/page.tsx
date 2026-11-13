@@ -1,5 +1,5 @@
 "use client";
-import { ArrowLeft, Check, FileText, MapPin, MessageSquare, Phone, UserX, X } from "lucide-react";
+import { ArrowLeft, Check, FileText, MapPin, MessageSquare, Phone, RotateCcw, UserMinus, UserX, X } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -7,9 +7,10 @@ import { EnvoiModale, QR } from "@/components/commun";
 import { Avatar, Barre, Btn, Card, Pastille, StatutBadge, Vide, champ, champS, cx, toast } from "@/components/ui";
 import { agencesProches, completude, moyenneEvaluation, nomComplet } from "@/lib/logic";
 import { fmtDate, fmtHeure, fmtQuand } from "@/lib/modeles";
-import { changerStatut, journaliser, majCandidat, verifierDocument } from "@/lib/ops";
+import { changerStatut, journaliser, majCandidat, reintegrer, verifierDocument } from "@/lib/ops";
 import { useStore } from "@/lib/store";
-import { ETAPES, STATUTS, statutInfo, type Statut, type TypeDocument } from "@/lib/types";
+import { SortieModale } from "@/components/FicheELP";
+import { ETAPES, STATUTS, estSorti, statutInfo, type Statut, type TypeDocument } from "@/lib/types";
 
 const PIECES: { type: TypeDocument; label: string }[] = [
   { type: "photo", label: "Photo d'identité" },
@@ -24,6 +25,7 @@ export default function Dossier() {
   const c = db.candidats.find((x) => x.id === id);
   const [envoi, setEnvoi] = useState(false);
   const [tel, setTel] = useState<string | null>(null);
+  const [sortie, setSortie] = useState<"exclu" | "desiste" | null>(null);
   const vu = useRef(false);
 
   useEffect(() => {
@@ -69,32 +71,42 @@ export default function Dossier() {
             <StatutBadge statut={c.statut} />
             {c.rang_attente && <Pastille ton="ambre">rang {c.rang_attente}</Pastille>}
           </div>
-          <p className="tabular mt-1 text-sm text-muted">{c.code} · {c.sexe === "F" ? "Fille" : "Garçon"} · {c.pourcentage_exetat} % à l&apos;Exetat · {c.commune}</p>
+          <p className="tabular mt-1 text-sm text-muted">{c.code} · {c.sexe === "F" ? "Fille" : "Garçon"} · {c.pourcentage_exetat} % à l&apos;Exetat · {c.commune}, {c.province}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <select aria-label="Changer le statut" className={cx(champS, "py-2")} value={c.statut} onChange={(e) => { changerStatut(c, e.target.value as Statut); journaliser(`Statut changé à la main : ${statutInfo(e.target.value as Statut).label}`, nomComplet(c)); }}>
             {STATUTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
           </select>
           <Btn variante="secondaire" onClick={() => setEnvoi(true)}><MessageSquare className="size-4" /> Message</Btn>
-          {!["desiste", "non_retenu", "termine"].includes(c.statut) && (
-            <Btn variante="danger" onClick={() => { changerStatut(c, "desiste"); journaliser("Désistement enregistré", nomComplet(c)); toast("Désistement enregistré. S'il était sélectionné, le tableau de bord propose un remplaçant."); }}><UserX className="size-4" /> Désistement</Btn>
+          {estSorti(c.statut) ? (
+            c.statut !== "non_retenu" && <Btn variante="secondaire" onClick={() => { reintegrer(c); toast(`${c.prenom} est réintégré(e).`); }}><RotateCcw className="size-4" /> Réintégrer</Btn>
+          ) : (
+            <>
+              <Btn variante="secondaire" onClick={() => setSortie("desiste")}><UserX className="size-4" /> Désistement</Btn>
+              <Btn variante="danger" onClick={() => setSortie("exclu")}><UserMinus className="size-4" /> Retirer du programme</Btn>
+            </>
           )}
         </div>
       </Card>
 
+      {estSorti(c.statut) && (
+        <Card className="mb-4 border-rose-200 bg-rose-50 p-4 text-sm">
+          <b className="text-rose-700">{c.statut === "exclu" ? "Retiré du programme" : c.statut === "desiste" ? "Désistement" : "Non retenu après le test"}{c.sorti_le ? ` le ${fmtQuand(c.sorti_le)}` : ""}.</b> {c.motif_sortie} <span className="text-muted">Le dossier ne compte plus dans les listes actives, mais tout son historique est conservé.</span>
+        </Card>
+      )}
       <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
         <div className="space-y-4">
           <Card className="p-5 sm:p-6">
             <h2 className="mb-4 font-bold">Parcours</h2>
             <ol className="grid grid-cols-7 gap-1">
-              {ETAPES.map((e) => {
+              {ETAPES.slice(0, 7).map((e) => {
                 const fait = etape > e.n || c.statut === "termine";
                 const ici = etape === e.n && c.statut !== "termine";
                 return (
                   <li key={e.n} className="text-center">
                     <div className="flex items-center">
                       <span className={cx("h-0.5 flex-1", e.n === 1 ? "opacity-0" : fait || ici ? "bg-brand-500" : "bg-sand-200")} />
-                      <span className={cx("grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold", fait ? "bg-brand-600 text-white" : ici ? "animate-pulse-ring bg-white text-brand-700 ring-2 ring-brand-600" : "bg-sand-200 text-muted")}>{fait ? <Check className="size-4" /> : e.n}</span>
+                      <span className={cx("grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold", fait ? "bg-brand-600 text-white" : ici ? "animate-pulse-ring bg-surface text-brand-700 ring-2 ring-brand-600" : "bg-sand-200 text-muted")}>{fait ? <Check className="size-4" /> : e.n}</span>
                       <span className={cx("h-0.5 flex-1", e.n === 7 ? "opacity-0" : fait ? "bg-brand-500" : "bg-sand-200")} />
                     </div>
                     <p className={cx("mt-2 text-[10px] leading-tight font-semibold sm:text-xs", !fait && !ici && "text-muted")}>{e.titre}</p>
@@ -112,29 +124,30 @@ export default function Dossier() {
                 <dd className="mt-0.5 flex items-center gap-2">
                   {tel == null ? (
                     <>
-                      <span className={cx("tabular font-semibold", c.telephone_invalide && "text-rose-700 line-through")}>{c.telephone || "—"}</span>
-                      {c.telephone_invalide && <Pastille ton="rouge">SMS en échec</Pastille>}
+                      <span className={cx("tabular font-semibold", c.contact_invalide && "text-rose-700 ")}>{c.telephone || "—"}</span>
+                      
                       <button className="text-xs font-bold text-brand-600" onClick={() => setTel(c.telephone)}>Corriger</button>
                     </>
                   ) : (
                     <>
                       <input autoFocus className={cx(champ, "py-1.5")} value={tel} onChange={(e) => setTel(e.target.value)} aria-label="Nouveau numéro" />
-                      <Btn petit onClick={() => { majCandidat(c, { telephone: tel, telephone_invalide: false, relances: 0 }); journaliser("Numéro de téléphone corrigé", nomComplet(c)); setTel(null); toast("Numéro corrigé : les prochains messages partiront vers ce numéro."); }}>OK</Btn>
+                      <Btn petit onClick={() => { majCandidat(c, { telephone: tel, contact_invalide: false, relances: 0 }); journaliser("Numéro de téléphone corrigé", nomComplet(c)); setTel(null); toast("Numéro corrigé : les prochains messages partiront vers ce numéro."); }}>OK</Btn>
                     </>
                   )}
                 </dd>
               </div>
+              <div><dt className="text-xs font-semibold text-muted">E-mail</dt><dd className={cx("mt-0.5 font-semibold break-all", c.contact_invalide && "text-rose-700")}>{c.email ?? "—"}{c.contact_invalide ? " (e-mails en échec)" : ""}</dd></div>
               {[
                 ["Date de naissance", c.date_naissance ? new Date(c.date_naissance).toLocaleDateString("fr-FR") : "—"],
                 ["École", c.ecole],
                 ["Section", c.section],
-                ["Adresse", c.adresse ? `${c.adresse}, ${c.commune}` : c.commune],
+                ["Adresse", [c.adresse, c.commune, c.province].filter(Boolean).join(", ")],
+                ["Université et chapitre", [c.universite, db.chapitres.find((k) => k.id === c.chapitre_id)?.nom].filter(Boolean).join(" · ") || "—"],
                 ["Position GPS", c.lat != null ? `${c.lat}, ${c.lng}` : "Non renseignée"],
-                ["Parent ou tuteur", c.parent_nom ? `${c.parent_nom} (${c.parent_lien}) · ${c.parent_telephone}` : "—"],
+                ["Parent ou tuteur", c.parent_nom ? [`${c.parent_nom} (${c.parent_lien})`, c.parent_telephone, c.parent_email].filter(Boolean).join(" · ") : "—"],
                 ["Contact d'urgence", c.urgence_nom ? `${c.urgence_nom} · ${c.urgence_telephone}` : "—"],
                 ["Santé", c.allergies || "Rien à signaler"],
-                ["E-mail", c.email ?? "—"],
-                ["Compte en agence", c.compte_ouvert ? "Ouvert" : "Pas encore ouvert"],
+                                ["Compte en agence", c.compte_ouvert ? "Ouvert" : "Pas encore ouvert"],
               ].map(([l, v]) => (
                 <div key={l}><dt className="text-xs font-semibold text-muted">{l}</dt><dd className="mt-0.5 font-semibold">{v}</dd></div>
               ))}
@@ -157,11 +170,9 @@ export default function Dossier() {
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-bold">{p.label}</p>
-                      <p className="text-xs text-muted">{d ? `${d.nom_fichier} · ${fmtQuand(d.signe_le ?? d.created_at)}` : "Manquant"}{d?.motif_rejet ? ` · ${d.motif_rejet}` : ""}</p>
+                      <p className="text-xs text-muted">{d ? `${d.nom_fichier} · ${fmtQuand(d.valide_le ?? d.created_at)}` : "Manquant"}{d?.motif_rejet ? ` · ${d.motif_rejet}` : ""}</p>
                     </div>
-                    {!d ? <Pastille ton="rouge">Manquant</Pastille> : d.statut === "valide" ? <Pastille ton="vert">Validé</Pastille> : d.statut === "signe" ? (
-                      <Link href={`/doc/autorisation/${c.id}`}><Pastille ton="vert">Signée · voir le PDF</Pastille></Link>
-                    ) : d.statut === "rejete" ? <Pastille ton="rouge">Rejeté</Pastille> : d.statut === "en_attente" ? <Pastille ton="ambre">En attente de signature</Pastille> : (
+                    {!d ? <Pastille ton="rouge">Manquant</Pastille> : d.statut === "valide" ? <Pastille ton="vert">Validé</Pastille> : d.statut === "rejete" ? <Pastille ton="rouge">Refusé</Pastille> : d.statut === "en_attente" ? <Link href={`/doc/autorisation/${c.id}`}><Pastille ton="ambre">Pas encore reçue · imprimer</Pastille></Link> : (
                       <span className="flex gap-1.5">
                         <Btn petit variante="secondaire" onClick={() => verifierDocument(d, true)}><Check className="size-3.5" /> Valider</Btn>
                         <Btn petit variante="danger" onClick={() => { const m = prompt("Motif du rejet (envoyé à l'élève) :", "Document illisible"); if (m) verifierDocument(d, false, m); }}><X className="size-3.5" /></Btn>
@@ -226,9 +237,10 @@ export default function Dossier() {
           {auto && (
             <Card className="p-5">
               <h2 className="font-bold">Autorisation parentale</h2>
-              <p className="mt-1 text-[13px] text-muted">{auto.statut === "signe" ? `Signée par ${auto.signe_par} le ${fmtQuand(auto.signe_le!)}. Code ${auto.code_verification}.` : `En attente de ${c.parent_nom || "parent"}. Le lien a été envoyé par SMS.`}</p>
+              <p className="mt-1 text-[13px] text-muted">{auto.statut === "valide" ? `Papier signé validé le ${fmtQuand(auto.valide_le ?? auto.created_at)}.` : auto.statut === "recu" ? `Photo déposée par ${auto.depose_par || "?"}, à vérifier.` : auto.statut === "rejete" ? `Refusée : ${auto.motif_rejet}. Une nouvelle photo est attendue.` : `À imprimer, signer à la main par ${c.parent_nom || "le parent"}, puis photographier.`}</p>
               <div className="mt-3 flex flex-wrap gap-2">
-                {auto.statut === "signe" ? <Link href={`/doc/autorisation/${c.id}`}><Btn petit variante="secondaire">Voir le document</Btn></Link> : <Link href={`/p/${c.parent_token}`} target="_blank"><Btn petit variante="secondaire">Ouvrir le lien du parent</Btn></Link>}
+                <Link href={`/doc/autorisation/${c.id}`}><Btn petit variante="secondaire">Imprimer</Btn></Link>
+                {auto.statut === "recu" ? <Link href="/autorisations"><Btn petit>Vérifier</Btn></Link> : auto.statut !== "valide" && <Link href={`/p/${c.parent_token}`} target="_blank"><Btn petit variante="discret">Page du parent</Btn></Link>}
               </div>
             </Card>
           )}
@@ -264,6 +276,7 @@ export default function Dossier() {
         </div>
       </div>
       <EnvoiModale cibles={envoi ? [c] : null} onClose={() => setEnvoi(false)} />
+      <SortieModale c={sortie ? c : null} type={sortie ?? "exclu"} onClose={() => setSortie(null)} />
     </>
   );
 }

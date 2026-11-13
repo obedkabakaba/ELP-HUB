@@ -1,6 +1,6 @@
 "use client";
-// « Qui doit faire quoi ensuite ? » — la plateforme lit les dossiers et prépare
-// la liste des actions du jour, chacune réglable en un clic.
+// « Qui doit faire quoi ensuite ? » — la plateforme lit les dossiers affichés
+// (cohorte et province choisies) et prépare la liste des actions du jour.
 import { completude, jourISO, joursDepuis, nomComplet } from "./logic";
 import { convoquer, envoyer, promouvoirAttente, relancer } from "./ops";
 import type { Candidat, DB } from "./types";
@@ -22,37 +22,41 @@ export function actionsDuJour(db: DB): ActionDuJour[] {
   const A: ActionDuJour[] = [];
   const c = db.candidats.filter((x) => !x.anonymise);
   const docs = db.documents;
-  const dernierMsg = (id: string) => {
-    let d: string | null = null;
-    for (const m of db.messages) if (m.candidat_id === id && (!d || m.created_at > d)) d = m.created_at;
-    return d;
-  };
-  const calme = (x: Candidat, jours: number) => joursDepuis(dernierMsg(x.id)) >= jours;
+  const dernier = new Map<string, string>();
+  const dernierParent = new Map<string, string>();
+  for (const m of db.messages) {
+    if (!m.candidat_id) continue;
+    if ((dernier.get(m.candidat_id) ?? "") < m.created_at) dernier.set(m.candidat_id, m.created_at);
+    if (m.destinataire === "parent" && (dernierParent.get(m.candidat_id) ?? "") < m.created_at) dernierParent.set(m.candidat_id, m.created_at);
+  }
+  const calme = (x: Candidat, jours: number) => joursDepuis(dernier.get(x.id) ?? null) >= jours || !dernier.has(x.id);
+  const comp = new Map(c.map((x) => [x.id, completude(x, docs)]));
 
-  // 1. Désistements → promouvoir la liste d'attente
-  const desistes = c.filter((x) => x.statut === "desiste" && !x.note_interne.includes("[Remplacé") && db.notes.some((n) => n.candidat_id === x.id));
-  const attente = c.filter((x) => x.statut === "attente");
-  if (desistes.length && attente.length)
+  // 1. Départs d'élèves retenus → proposer la liste d'attente
+  const autos = new Map(docs.filter((d) => d.type === "autorisation").map((d) => [d.candidat_id, d]));
+  const partis = c.filter((x) => (x.statut === "desiste" || x.statut === "exclu") && autos.has(x.id) && !x.note_interne.includes("[Remplacé") && joursDepuis(x.sorti_le) <= 30);
+  const aRemplacer = partis.filter((x) => c.some((y) => y.statut === "attente" && y.cohorte_id === x.cohorte_id));
+  if (aRemplacer.length)
     A.push({
       id: "promotion",
       urgence: 1,
-      titre: `${pl(desistes.length, "désistement", "désistements")} : une place à réattribuer`,
-      detail: `${desistes.map(nomComplet).join(", ")}. La plateforme propose le premier de la liste d'attente, du même sexe pour garder la parité.`,
-      cibles: desistes,
+      titre: `${pl(aRemplacer.length, "départ", "départs")} : une place à réattribuer`,
+      detail: `${aRemplacer.map(nomComplet).join(", ")}. La plateforme propose le premier de la liste d'attente de la même cohorte.`,
+      cibles: aRemplacer,
       bouton: "Promouvoir la liste d'attente",
       executer: () => {
-        const noms = desistes.map((d) => promouvoirAttente(d)).filter(Boolean).map((x) => nomComplet(x!));
-        return noms.length ? `${noms.join(", ")} : sélectionné(e), SMS envoyé et autorisation demandée au parent.` : "La liste d'attente est vide.";
+        const noms = aRemplacer.map((d) => promouvoirAttente(d)).filter(Boolean).map((x) => nomComplet(x!));
+        return noms.length ? `${noms.join(", ")} : retenu(e), prévenu(e) par e-mail, autorisation demandée.` : "La liste d'attente est vide.";
       },
     });
 
-  // 2. Numéros en échec
-  const echecs = c.filter((x) => x.telephone_invalide && !["non_retenu", "desiste", "termine"].includes(x.statut));
+  // 2. Adresses en échec
+  const echecs = c.filter((x) => x.contact_invalide && ["invite", "inscrit", "convoque", "teste", "selectionne", "induction", "stage"].includes(x.statut));
   if (echecs.length)
-    A.push({ id: "echecs", urgence: 1, titre: `${pl(echecs.length, "numéro ne reçoit", "numéros ne reçoivent")} pas les SMS`, detail: "Messages en échec : joindre l'école ou corriger le numéro dans le dossier.", cibles: echecs, lien: "/candidats?filtre=echec" });
+    A.push({ id: "echecs", urgence: 1, titre: `${pl(echecs.length, "élève ne reçoit", "élèves ne reçoivent")} pas les e-mails`, detail: "Adresse erronée ou boîte pleine : appeler l'élève ou son école, puis corriger l'adresse dans la fiche.", cibles: echecs, lien: "/candidats?filtre=echec" });
 
   // 3. Invités silencieux
-  const silencieux = c.filter((x) => x.statut === "invite" && !x.telephone_invalide && joursDepuis(x.invite_le) >= 3);
+  const silencieux = c.filter((x) => x.statut === "invite" && !x.contact_invalide && joursDepuis(x.invite_le) >= 3);
   const aRelancer = silencieux.filter((x) => x.relances < 2 && calme(x, 2));
   const aAppeler = silencieux.filter((x) => x.relances >= 2);
   if (aRelancer.length)
@@ -60,143 +64,149 @@ export function actionsDuJour(db: DB): ActionDuJour[] {
       id: "relance-invites",
       urgence: 2,
       titre: `${pl(aRelancer.length, "invité n'a", "invités n'ont")} pas commencé l'inscription`,
-      detail: "Invités depuis 3 jours ou plus, sans réponse. Relance par SMS, puis par WhatsApp à la deuxième tentative.",
+      detail: "Invités depuis 3 jours ou plus, sans réponse. Deux relances par e-mail au maximum, ensuite c'est un appel.",
       cibles: aRelancer,
-      bouton: "Relancer",
+      bouton: "Relancer par e-mail",
       executer: () => `${relancer(aRelancer, "relance_inscription").envoyes} relances envoyées.`,
     });
   if (aAppeler.length)
-    A.push({ id: "appels", urgence: 2, titre: `${pl(aAppeler.length, "élève", "élèves")} à appeler`, detail: "Déjà relancés deux fois sans réponse : un appel de l'encadreur est plus efficace qu'un troisième message.", cibles: aAppeler, lien: "/candidats?filtre=appel" });
+    A.push({ id: "appels", urgence: 2, titre: `${pl(aAppeler.length, "élève", "élèves")} à appeler`, detail: "Déjà relancés deux fois sans réponse : un appel de l'encadreur est plus efficace qu'un troisième e-mail.", cibles: aAppeler, lien: "/candidats?filtre=appel" });
 
-  // 4. Dossiers incomplets
-  const incomplets = c.filter((x) => x.statut === "inscrit" && completude(x, docs).pct < 100);
-  const incRelance = incomplets.filter((x) => x.relances < 2 && calme(x, 2));
-  if (incRelance.length)
+  // 4. Inscriptions incomplètes (première phase : peu d'informations demandées)
+  const incomplets = c.filter((x) => x.statut === "inscrit" && comp.get(x.id)!.pct < 100 && x.relances < 2 && calme(x, 2));
+  if (incomplets.length)
     A.push({
       id: "incomplets",
       urgence: 2,
-      titre: `${pl(incRelance.length, "dossier incomplet", "dossiers incomplets")}`,
-      detail: "Chaque élève reçoit la liste exacte de ce qui lui manque (GPS, bulletin, pièce d'identité…).",
-      cibles: incRelance,
-      bouton: "Envoyer les pièces manquantes",
-      executer: () => `${relancer(incRelance, "dossier_incomplet").envoyes} messages personnalisés envoyés.`,
+      titre: pl(incomplets.length, "inscription incomplète", "inscriptions incomplètes"),
+      detail: "Chaque élève reçoit la liste exacte de ce qui lui manque pour pouvoir être convoqué.",
+      cibles: incomplets,
+      bouton: "Envoyer ce qui manque",
+      executer: () => `${relancer(incomplets, "dossier_incomplet").envoyes} e-mails personnalisés envoyés.`,
     });
 
-  // 5. Pièces à vérifier
-  const aVerifier = new Set(docs.filter((d) => d.statut === "recu").map((d) => d.candidat_id));
-  const candAVerifier = c.filter((x) => aVerifier.has(x.id) && x.statut === "inscrit");
-  if (candAVerifier.length) A.push({ id: "pieces", urgence: 3, titre: `${pl(candAVerifier.length, "dossier a", "dossiers ont")} des pièces à vérifier`, detail: "Photo, bulletin ou pièce d'identité reçus mais pas encore validés.", cibles: candAVerifier, lien: "/candidats?filtre=pieces" });
-
-  // 6. Dossiers complets à convoquer
+  // 5. Inscrits complets à convoquer
   const convoques = new Set(db.convocations.map((k) => k.candidat_id));
-  const prets = c.filter((x) => x.statut === "inscrit" && completude(x, docs).pct === 100 && !convoques.has(x.id));
-  const aVenir = db.sessions_test.filter((s) => s.date_heure > new Date().toISOString());
-  if (prets.length && aVenir.length)
+  const prets = c.filter((x) => x.statut === "inscrit" && comp.get(x.id)!.pct === 100 && !convoques.has(x.id));
+  const now = new Date().toISOString();
+  const aVenir = db.sessions_test.filter((s) => s.date_heure > now);
+  const convocables = prets.filter((x) => aVenir.some((s) => s.cohorte_id === x.cohorte_id));
+  if (convocables.length)
     A.push({
       id: "convoquer",
       urgence: 2,
-      titre: `${pl(prets.length, "dossier complet", "dossiers complets")} à convoquer`,
-      detail: "Chacun est placé dans le centre de test le plus proche de chez lui, selon les places restantes.",
-      cibles: prets,
+      titre: `${pl(convocables.length, "inscrit", "inscrits")} à convoquer au test`,
+      detail: "Chacun est placé dans le centre de test le plus proche, dans sa province, selon les places restantes.",
+      cibles: convocables,
       bouton: "Convoquer",
       executer: () => {
-        const r = convoquer(prets);
+        const r = convoquer(convocables);
         return `${r.convoques} convocations envoyées avec QR code${r.sansPlace ? ` — ${r.sansPlace} sans place : ajoutez une session.` : "."}`;
       },
     });
-  else if (prets.length >= 10 && !db.sessions_test.length)
-    A.push({ id: "sessions", urgence: 3, titre: `${prets.length} dossiers complets attendent une date de test`, detail: "Créez les sessions de test pour pouvoir envoyer les convocations.", cibles: prets, lien: "/tests" });
+  else if (prets.length >= 10) A.push({ id: "sessions", urgence: 3, titre: `${prets.length} inscrits attendent une date de test`, detail: "Créez les sessions de test de la cohorte pour pouvoir envoyer les convocations.", cibles: prets, lien: "/tests" });
 
-  // 7. Convoqués sans confirmation
+  // 6. Convoqués sans confirmation
   const sansConf = c.filter((x) => {
     if (x.statut !== "convoque") return false;
     const k = db.convocations.find((y) => y.candidat_id === x.id);
     const s = k && db.sessions_test.find((y) => y.id === k.session_id);
-    return !!k && k.confirme == null && k.present == null && !!s && s.date_heure > new Date().toISOString();
+    return !!k && k.confirme == null && k.present == null && !!s && s.date_heure > now && calme(x, 1);
   });
-  const confRelance = sansConf.filter((x) => calme(x, 1));
-  if (confRelance.length)
+  if (sansConf.length)
     A.push({
       id: "confirmations",
       urgence: 2,
-      titre: `${pl(confRelance.length, "convoqué n'a", "convoqués n'ont")} pas confirmé sa présence`,
-      detail: "Rappel du lieu, de la date et de l'heure ; l'élève confirme en répondant 1 par SMS.",
-      cibles: confRelance,
+      titre: `${pl(sansConf.length, "convoqué n'a", "convoqués n'ont")} pas confirmé sa présence`,
+      detail: "Rappel du lieu, de la date et de l'heure, avec le bouton de confirmation.",
+      cibles: sansConf,
       bouton: "Rappeler",
-      executer: () => `${envoyer(confRelance, "relance_confirmation", "sms", { campagne: "Relances automatiques" })} rappels envoyés.`,
+      executer: () => `${envoyer(sansConf, "relance_confirmation", "email", { campagne: "Relances automatiques" })} rappels envoyés.`,
     });
 
-  // 8. Absents au test
-  const absents = c.filter((x) => x.statut === "convoque" && db.convocations.some((k) => k.candidat_id === x.id && k.present === false));
-  const absRelance = absents.filter((x) => !db.messages.some((m) => m.candidat_id === x.id && m.modele === "rattrapage"));
-  if (absRelance.length)
+  // 7. Absents au test
+  const absents = c.filter((x) => x.statut === "convoque" && db.convocations.some((k) => k.candidat_id === x.id && k.present === false) && !db.messages.some((m) => m.candidat_id === x.id && m.modele === "rattrapage"));
+  if (absents.length)
     A.push({
       id: "absents",
       urgence: 2,
-      titre: `${pl(absRelance.length, "absent", "absents")} au test`,
-      detail: "Convoqués mais non émargés. Proposer une session de rattrapage avant de clôturer la sélection.",
-      cibles: absRelance,
+      titre: `${pl(absents.length, "absent", "absents")} au test`,
+      detail: "Convoqués mais non émargés. Proposer un rattrapage avant de clôturer la sélection.",
+      cibles: absents,
       bouton: "Proposer un rattrapage",
-      executer: () => `${envoyer(absRelance, "rattrapage", "sms")} propositions envoyées.`,
+      executer: () => `${envoyer(absents, "rattrapage", "email")} propositions envoyées.`,
     });
 
-  // 9. Notes manquantes
+  // 8. Notes manquantes, puis sélection à faire
   const sansNote = c.filter((x) => x.statut === "teste" && !db.notes.some((n) => n.candidat_id === x.id));
-  if (sansNote.length) A.push({ id: "notes", urgence: 2, titre: `${pl(sansNote.length, "note manquante", "notes manquantes")}`, detail: "Candidats émargés dont la note n'est pas encore saisie ou importée.", cibles: sansNote, lien: "/tests" });
-
-  // 10. Sélection à faire
+  if (sansNote.length) A.push({ id: "notes", urgence: 2, titre: pl(sansNote.length, "note manquante", "notes manquantes"), detail: "Candidats émargés dont la note n'est pas encore saisie ou importée.", cibles: sansNote, lien: "/tests?onglet=notes" });
   const testes = c.filter((x) => x.statut === "teste");
-  if (testes.length >= 20 && !sansNote.length && !c.some((x) => x.statut === "selectionne" || x.statut === "induction" || x.statut === "stage"))
-    A.push({ id: "selection", urgence: 1, titre: "Les notes sont prêtes : lancer la sélection", detail: `${testes.length} candidats notés. Simulez le classement avec les quotas 50/50, puis validez.`, cibles: testes, lien: "/tests?onglet=selection" });
+  if (testes.length >= 10 && !sansNote.length) A.push({ id: "selection", urgence: 1, titre: "Les notes sont prêtes : lancer la sélection", detail: `${testes.length} candidats notés. Réglez le nombre de places et la règle filles / garçons, simulez, puis validez.`, cibles: testes, lien: "/tests?onglet=selection" });
 
-  // 11. Autorisations parentales
-  const signes = new Set(docs.filter((d) => d.type === "autorisation" && d.statut === "signe").map((d) => d.candidat_id));
-  const sansAuto = c.filter((x) => x.statut === "selectionne" && !signes.has(x.id));
-  const autoRelance = sansAuto.filter((x) => {
-    const d = db.messages.filter((m) => m.candidat_id === x.id && m.destinataire === "parent").map((m) => m.created_at).sort().pop();
-    return joursDepuis(d ?? null) >= 1;
-  });
+  // 9. Retenus : dossier complet à fournir
+  const elus = c.filter((x) => x.statut === "selectionne");
+  const dossierIncomplet = elus.filter((x) => comp.get(x.id)!.manquants.some((m) => !m.startsWith("autorisation")) && calme(x, 2));
+  if (dossierIncomplet.length)
+    A.push({
+      id: "dossiers-retenus",
+      urgence: 2,
+      titre: `${pl(dossierIncomplet.length, "retenu doit", "retenus doivent")} compléter son dossier`,
+      detail: "Adresse, position du domicile, pièces : demandés seulement aux élèves retenus, après le test.",
+      cibles: dossierIncomplet,
+      bouton: "Rappeler ce qui manque",
+      executer: () => `${envoyer(dossierIncomplet, "dossier_incomplet", "email", { campagne: "Relances automatiques" })} e-mails personnalisés envoyés.`,
+    });
+
+  // 10. Autorisations parentales : à vérifier, à relancer
+  const recues = elus.filter((x) => autos.get(x.id)?.statut === "recu");
+  if (recues.length) A.push({ id: "autorisations-recues", urgence: 1, titre: `${pl(recues.length, "autorisation signée", "autorisations signées")} à vérifier`, detail: "Le papier signé a été photographié et déposé : vérifiez la signature, puis validez ou refusez.", cibles: recues, lien: "/autorisations" });
+  const sansAuto = elus.filter((x) => ["en_attente", "rejete"].includes(autos.get(x.id)?.statut ?? ""));
+  const autoRelance = sansAuto.filter((x) => joursDepuis(dernierParent.get(x.id) ?? autos.get(x.id)!.created_at) >= 1 && calme(x, 1));
   if (autoRelance.length)
     A.push({
       id: "autorisations",
       urgence: 1,
-      titre: `${pl(autoRelance.length, "autorisation parentale", "autorisations parentales")} non signée${autoRelance.length > 1 ? "s" : ""}`,
-      detail: "Sans signature, l'élève ne peut pas partir en induction. Le parent reçoit à nouveau son lien (WhatsApp).",
+      titre: `${pl(autoRelance.length, "autorisation parentale", "autorisations parentales")} pas encore reçue${autoRelance.length > 1 ? "s" : ""}`,
+      detail: "À imprimer, signer à la main, puis photographier. Le parent est relancé par e-mail ; sans adresse, c'est l'élève qui est prévenu.",
       cibles: autoRelance,
-      bouton: "Relancer les parents",
-      executer: () => `${envoyer(autoRelance, "relance_autorisation", "whatsapp", { campagne: "Relances automatiques" })} parents relancés.`,
+      bouton: "Relancer",
+      executer: () => {
+        const avec = autoRelance.filter((x) => x.parent_email);
+        const sans = autoRelance.filter((x) => !x.parent_email);
+        envoyer(avec, "relance_autorisation", "email", { campagne: "Relances automatiques" });
+        envoyer(sans, "dossier_incomplet", "email", { campagne: "Relances automatiques" });
+        return `${avec.length} parents et ${sans.length} élèves relancés.`;
+      },
     });
-  else if (sansAuto.length) A.push({ id: "autorisations-attente", urgence: 3, titre: `${pl(sansAuto.length, "autorisation", "autorisations")} en attente de signature`, detail: "Parents déjà relancés aujourd'hui. Passé 3 jours, prévoyez un appel.", cibles: sansAuto, lien: "/autorisations" });
 
-  // 12. Induction prête
-  const elus = c.filter((x) => x.statut === "selectionne");
-  if (elus.length && !sansAuto.length) A.push({ id: "induction", urgence: 2, titre: "Toutes les autorisations sont signées", detail: `${elus.length} sélectionnés peuvent partir en induction : attribuez les chambres et lancez la semaine.`, cibles: elus, lien: "/induction" });
+  // 11. Induction prête
+  if (elus.length && elus.every((x) => autos.get(x.id)?.statut === "valide")) A.push({ id: "induction", urgence: 2, titre: "Toutes les autorisations sont validées", detail: `${elus.length} retenus peuvent partir en induction : attribuez les chambres et lancez la semaine.`, cibles: elus, lien: "/induction" });
 
-  // 13. Affectation à faire
+  // 12. Affectation à faire
   const affectes = new Set(db.affectations.filter((a) => a.statut === "validee").map((a) => a.candidat_id));
   const sansAgence = c.filter((x) => x.statut === "induction" && !affectes.has(x.id));
-  if (sansAgence.length) A.push({ id: "affectation", urgence: 3, titre: `${sansAgence.length} futurs stagiaires sans agence`, detail: "La plateforme calcule l'agence la plus proche de chaque domicile, dans la limite des places.", cibles: sansAgence, lien: "/stage" });
+  if (sansAgence.length) A.push({ id: "affectation", urgence: 3, titre: `${sansAgence.length} futurs stagiaires sans agence`, detail: "La plateforme calcule l'agence la plus proche de chaque domicile, dans la province de l'élève et la limite des places.", cibles: sansAgence, lien: "/stage" });
 
-  // 14. Absences en stage
+  // 13. Absences en stage
   const auj = jourISO();
   const absStage = c.filter((x) => {
     if (x.statut !== "stage") return false;
     const jours = db.presences.filter((p) => p.candidat_id === x.id && p.contexte === "stage").map((p) => p.jour).sort();
-    const dernier = jours[jours.length - 1];
-    return !!dernier && dernier < auj && joursDepuis(dernier + "T12:00:00") >= 3;
+    const d = jours[jours.length - 1];
+    return !!d && d < auj && joursDepuis(d + "T12:00:00") >= 3 && !db.messages.some((m) => m.candidat_id === x.id && m.modele === "absence_stage" && joursDepuis(m.created_at) < 3);
   });
   if (absStage.length)
     A.push({
       id: "absences-stage",
       urgence: 1,
       titre: `${pl(absStage.length, "stagiaire n'a", "stagiaires n'ont")} pas pointé depuis 3 jours`,
-      detail: `${absStage.map(nomComplet).join(", ")}. Prendre des nouvelles avant que l'absence ne devienne un abandon.`,
+      detail: `${absStage.slice(0, 5).map(nomComplet).join(", ")}${absStage.length > 5 ? "…" : ""}. Prendre des nouvelles avant que l'absence ne devienne un abandon.`,
       cibles: absStage,
-      bouton: "Envoyer un message",
-      executer: () => `${envoyer(absStage, "absence_stage", "sms", { extra: () => ({ jours: 3 }) })} messages envoyés. Pensez aussi à appeler le chef d'agence.`,
+      bouton: "Écrire aux stagiaires",
+      executer: () => `${envoyer(absStage, "absence_stage", "email", { extra: () => ({ jours: 3 }) })} e-mails envoyés. Pensez aussi à appeler le chef d'agence.`,
     });
 
-  // 15. Pointages hors zone à confirmer / comptes à ouvrir
+  // 14. Pointages hors zone, comptes à ouvrir
   const horsZone = db.presences.filter((p) => p.hors_zone && !p.valide);
   if (horsZone.length) A.push({ id: "hors-zone", urgence: 3, titre: `${pl(horsZone.length, "pointage", "pointages")} hors zone à confirmer`, detail: "Le stagiaire a pointé à plus de 300 m de son agence : le chef d'agence doit confirmer.", cibles: c.filter((x) => horsZone.some((p) => p.candidat_id === x.id)), lien: "/stage" });
   const sansCompte = c.filter((x) => x.statut === "stage" && !x.compte_ouvert);

@@ -6,19 +6,19 @@ import { Avatar, Btn, Card, Chiffre, Entete, Onglets, Pastille, Vide, champS, to
 import { jourISO, nomComplet } from "@/lib/logic";
 import { attribuerChambres, demarrerInduction } from "@/lib/ops";
 import { PROGRAMME } from "@/lib/programme";
-import { useStore } from "@/lib/store";
+import { useVue } from "@/lib/store";
 
 type Onglet = "participants" | "presences" | "programme";
 
 export default function Induction() {
-  const db = useStore((s) => s.db);
+  const db = useVue();
   const [onglet, setOnglet] = useState<Onglet>("participants");
   const [debut, setDebut] = useState(() => jourISO(new Date(Date.now() + 5 * 86400000)));
 
   const d = useMemo(() => {
     const elus = db.candidats.filter((c) => c.statut === "selectionne");
     const enCours = db.candidats.filter((c) => c.statut === "induction");
-    const signes = new Set(db.documents.filter((x) => x.type === "autorisation" && x.statut === "signe").map((x) => x.candidat_id));
+    const signes = new Set(db.documents.filter((x) => x.type === "autorisation" && x.statut === "valide").map((x) => x.candidat_id));
     const liste = [...enCours, ...elus].sort((a, b) => (a.chambre ?? "zz").localeCompare(b.chambre ?? "zz") || nomComplet(a).localeCompare(nomComplet(b)));
     const pres = db.presences.filter((p) => p.contexte === "induction");
     const jours = [...new Set(pres.map((p) => p.jour))].sort();
@@ -39,7 +39,7 @@ export default function Induction() {
         <>
           <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Chiffre accent label="Participants" valeur={d.liste.length} detail={`${d.liste.filter((c) => c.sexe === "F").length} filles · ${d.liste.filter((c) => c.sexe === "M").length} garçons`} />
-            <Chiffre label="Autorisations signées" valeur={<>{d.liste.filter((c) => d.signes.has(c.id)).length}<span className="text-base text-muted"> / {d.liste.length}</span></>} />
+            <Chiffre label="Autorisations validées" valeur={<>{d.liste.filter((c) => d.signes.has(c.id)).length}<span className="text-base text-muted"> / {d.liste.length}</span></>} />
             <Chiffre label="Chambres attribuées" valeur={new Set(d.liste.map((c) => c.chambre).filter(Boolean)).size} detail={sansChambre ? `${sansChambre} sans chambre` : "2 personnes par chambre"} />
             <Chiffre label="Présence moyenne" valeur={d.jours.length ? `${Math.round(([...d.parJour.values()].reduce((s, x) => s + x.size, 0) / (d.jours.length * Math.max(1, d.enCours.length))) * 100)} %` : "—"} detail={`${d.jours.length} jour(s) pointé(s)`} />
           </div>
@@ -48,7 +48,7 @@ export default function Induction() {
             <Card className="mb-4 flex flex-wrap items-center gap-3 border-brand-200 bg-brand-50 p-4 sm:px-6">
               <div className="mr-auto min-w-56 text-sm">
                 <p className="font-bold">{prets} sélectionnés sur {d.elus.length} peuvent partir en induction</p>
-                <p className="text-muted">{d.elus.length - prets ? `${d.elus.length - prets} bloqués : autorisation parentale non signée.` : "Toutes les autorisations sont signées."}</p>
+                <p className="text-muted">{d.elus.length - prets ? `${d.elus.length - prets} bloqués : autorisation parentale pas encore validée.` : "Toutes les autorisations sont signées."}</p>
               </div>
               <Btn variante="secondaire" onClick={() => toast(`Chambres attribuées à ${attribuerChambres()} participants.`)}><BedDouble className="size-4" /> Attribuer les chambres</Btn>
               <input type="date" className={champS} value={debut} onChange={(e) => setDebut(e.target.value)} aria-label="Premier jour de l'induction" />

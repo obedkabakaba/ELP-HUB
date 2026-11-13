@@ -17,7 +17,7 @@ export const esc = (s: string | number | null | undefined) => String(s ?? "").re
 
 type Carte = { map: LMap; calque: LayerGroup; L: typeof import("leaflet") };
 
-export function MapView({ points, lignes, chaleur = null, className, onPick }: { points: Point[]; lignes?: [number, number, number, number][]; chaleur?: [number, number][] | null; className?: string; onPick?: (lat: number, lng: number) => void }) {
+export function MapView({ points, lignes, chaleur = null, className, onPick, centre, zoom = 12 }: { points: Point[]; lignes?: [number, number, number, number][]; chaleur?: [number, number][] | null; className?: string; onPick?: (lat: number, lng: number) => void; centre?: [number, number]; zoom?: number }) {
   const el = useRef<HTMLDivElement>(null);
   const pick = useRef(onPick);
   const [carte, setCarte] = useState<Carte | null>(null);
@@ -45,6 +45,13 @@ export function MapView({ points, lignes, chaleur = null, className, onPick }: {
       setCarte(null);
     };
   }, []);
+
+  // Recentre la carte quand on change de province.
+  const cle = centre ? `${centre[0]},${centre[1]},${zoom}` : "";
+  useEffect(() => {
+    if (carte && centre) carte.map.setView(centre, zoom);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carte, cle]);
 
   useEffect(() => {
     if (!carte) return;

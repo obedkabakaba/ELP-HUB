@@ -36,16 +36,14 @@ export default function Accueil() {
   return (
     <div className="min-h-dvh">
       <BandeauDemo />
-      <section className="motif-toit relative overflow-hidden bg-brand-950 text-white">
-        <div className="absolute -top-40 -right-40 size-[520px] rounded-full bg-brand-600/40 blur-3xl" />
-        <div className="absolute -bottom-52 left-1/4 size-[420px] rounded-full bg-gold-500/20 blur-3xl" />
+      <section className="motif relative overflow-hidden bg-brand-950 text-white">
         <div className="relative mx-auto max-w-6xl px-5 pt-6 pb-16 sm:px-8 sm:pb-24">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <Logo taille={46} />
+              <Logo taille={50} />
               <div className="leading-tight">
                 <p className="text-lg font-extrabold">ELP Hub</p>
-                <p className="text-xs text-white/60">EquityBCDC · Equity Leaders Program</p>
+                <p className="text-xs text-white/60">Equity Leaders Program</p>
               </div>
             </div>
             <Outils clair />
@@ -57,9 +55,9 @@ export default function Accueil() {
             </h1>
             <p className="mt-5 max-w-2xl text-base text-white/70 sm:text-lg">Un dossier unique par élève, des statuts en temps réel, et une plateforme qui dit chaque matin à l&apos;encadreur qui relancer, qui convoquer et qui appeler.</p>
           </div>
-          <ol className="mt-12 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+          <ol className="mt-12 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
             {ETAPES.map((e) => (
-              <li key={e.n} className={`rounded-2xl p-3.5 ring-1 transition ${!SUPABASE_ACTIF && e.n === etape ? "bg-white text-ink ring-white" : "bg-white/[0.06] ring-white/10"}`}>
+              <li key={e.n} className={`rounded-2xl p-3.5 ring-1 transition ${!SUPABASE_ACTIF && e.n === etape ? "bg-surface text-ink ring-white" : "bg-white/[0.06] ring-white/10"}`}>
                 <p className={`text-[11px] font-bold ${!SUPABASE_ACTIF && e.n === etape ? "text-brand-600" : "text-gold-400"}`}>ÉTAPE {e.n}</p>
                 <p className="mt-0.5 text-sm leading-snug font-bold">{e.titre}</p>
               </li>
@@ -70,7 +68,7 @@ export default function Accueil() {
 
       <section className="mx-auto -mt-8 max-w-6xl px-5 pb-16 sm:px-8">
         {SUPABASE_ACTIF ? (
-          <form onSubmit={seConnecter} className="relative mx-auto max-w-md space-y-4 rounded-3xl border border-sand-200 bg-white p-7 shadow-pop">
+          <form onSubmit={seConnecter} className="relative mx-auto max-w-md space-y-4 rounded-3xl border border-sand-200 bg-surface p-7 shadow-pop">
             <h2 className="text-xl font-extrabold">Connexion</h2>
             <Champ label="Adresse e-mail">
               <input className={champ} type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -87,7 +85,7 @@ export default function Accueil() {
               {ROLES.map((r) => {
                 const I = ICONES[r.id];
                 return (
-                  <button key={r.id} onClick={() => entrer(r.id)} className="group flex flex-col rounded-3xl border border-sand-200 bg-white p-5 text-left shadow-card transition hover:-translate-y-1 hover:border-brand-300 hover:shadow-pop">
+                  <button key={r.id} onClick={() => entrer(r.id)} className="group flex flex-col rounded-3xl border border-sand-200 bg-surface p-5 text-left shadow-card transition hover:-translate-y-1 hover:border-brand-300 hover:shadow-pop">
                     <span className="grid size-11 place-items-center rounded-2xl bg-brand-50 text-brand-600 transition group-hover:bg-brand-600 group-hover:text-white">
                       <I className="size-5" />
                     </span>
@@ -100,16 +98,16 @@ export default function Accueil() {
                 );
               })}
             </div>
-            <p className="mt-4 text-center text-xs text-muted">Le parent ou tuteur n&apos;a pas de compte : il reçoit un lien par SMS. Ouvrez le « Téléphone démo » pour le voir.</p>
+            <p className="mt-4 text-center text-xs text-muted">Le parent ou tuteur n&apos;a pas de compte : il reçoit un lien par e-mail. Ouvrez la « Boîte mail démo » pour le voir.</p>
           </>
         )}
 
         <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[
-            { I: BellRing, t: "Actions du jour", d: "La plateforme repère les dossiers bloqués et propose la relance adaptée : SMS, puis WhatsApp, puis appel." },
-            { I: FileSignature, t: "Signature parentale par SMS", d: "Le parent signe depuis son téléphone avec un code reçu par SMS. Le document obtenu est vérifiable par QR code." },
-            { I: MapPinned, t: "Affectation optimale", d: "Chaque stagiaire est placé dans l'agence la plus proche de chez lui, en respectant les places de chaque agence." },
-            { I: WifiOff, t: "Pensé pour la 2G", d: "Application installable, utilisable hors ligne, synchronisée au retour du réseau. Réponses possibles par simple SMS." },
+            { I: BellRing, t: "Actions du jour", d: "La plateforme repère les dossiers bloqués et propose la bonne relance : deux e-mails, puis un appel de l'encadreur." },
+            { I: FileSignature, t: "Autorisation sur papier", d: "Le parent imprime l'autorisation déjà remplie, la signe à la main et en envoie la photo. L'encadreur vérifie et valide." },
+            { I: MapPinned, t: "Affectation optimale", d: "Chaque stagiaire est placé dans l'agence la plus proche de chez lui, dans sa province, et l'affectation peut changer en cours de stage." },
+            { I: WifiOff, t: "Pensé pour la 2G et pour durer", d: "Application installable, utilisable hors ligne, synchronisée au retour du réseau. Toutes les cohortes et toutes les provinces au même endroit." },
           ].map(({ I, t, d }) => (
             <div key={t} className="rounded-2xl bg-sand-100 p-5">
               <I className="size-5 text-brand-600" />

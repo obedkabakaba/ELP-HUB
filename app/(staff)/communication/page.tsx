@@ -6,21 +6,22 @@ import { EnvoiModale } from "@/components/commun";
 import { Btn, Card, Chiffre, Entete, Onglets, Pastille, Vide, champS, toast } from "@/components/ui";
 import { actionsDuJour } from "@/lib/actions";
 import { nomComplet } from "@/lib/logic";
-import { COUT_USD, MODELES, fmtQuand, segments } from "@/lib/modeles";
-import { useStore } from "@/lib/store";
+import { MODELES, NOM_CANAL, fmtQuand } from "@/lib/modeles";
+import { NomELP } from "@/components/FicheELP";
+import { useVue } from "@/lib/store";
 import { STATUTS, type Candidat, type Statut } from "@/lib/types";
 
 type Onglet = "campagnes" | "relances" | "reponses" | "modeles";
 
 export default function Communication() {
-  const db = useStore((s) => s.db);
+  const db = useVue();
   const [onglet, setOnglet] = useState<Onglet>("campagnes");
   const [cible, setCible] = useState<Statut>("inscrit");
   const [envoi, setEnvoi] = useState<Candidat[] | null>(null);
   const actions = useMemo(() => actionsDuJour(db).filter((a) => a.executer && a.id !== "promotion" && a.id !== "convoquer"), [db]);
 
   const { campagnes, stats, reponses, echecs } = useMemo(() => {
-    const sortants = db.messages.filter((m) => m.modele !== "reponse");
+    const sortants = db.messages;
     const m = new Map<string, { nom: string; total: number; livres: number; lus: number; echecs: number; dernier: string; canaux: Set<string>; cout: number }>();
     for (const x of sortants) {
       const k = m.get(x.campagne) ?? { nom: x.campagne, total: 0, livres: 0, lus: 0, echecs: 0, dernier: x.created_at, canaux: new Set<string>(), cout: 0 };
@@ -30,24 +31,24 @@ export default function Communication() {
       if (x.statut === "echec") k.echecs++;
       if (x.created_at > k.dernier) k.dernier = x.created_at;
       k.canaux.add(x.canal);
-      k.cout += (x.canal === "sms" ? segments(x.contenu) : 1) * COUT_USD[x.canal];
+      k.cout += 0;
       m.set(x.campagne, k);
     }
     const livres = sortants.filter((x) => x.statut === "livre" || x.statut === "lu").length;
     return {
       campagnes: [...m.values()].sort((a, b) => b.dernier.localeCompare(a.dernier)),
       stats: { total: sortants.length, taux: sortants.length ? Math.round((livres / sortants.length) * 100) : 0, echecs: sortants.filter((x) => x.statut === "echec").length, cout: [...m.values()].reduce((s, k) => s + k.cout, 0) },
-      reponses: db.messages.filter((x) => x.modele === "reponse").reverse(),
+      reponses: db.convocations.filter((k) => k.confirme != null).map((k) => ({ k, c: db.candidats.find((x) => x.id === k.candidat_id)! })).filter((r) => r.c),
       echecs: sortants.filter((x) => x.statut === "echec"),
     };
-  }, [db.messages]);
+  }, [db.messages, db.candidats, db.convocations]);
 
   const parId = useMemo(() => new Map(db.candidats.map((c) => [c.id, c])), [db.candidats]);
   const echecsUniques = [...new Map(echecs.map((m) => [m.candidat_id, m])).values()];
 
   return (
     <>
-      <Entete titre="Communication" sous="SMS d'abord, WhatsApp ensuite. Chaque message est suivi : envoyé, remis, lu ou en échec.">
+      <Entete titre="Communication" sous="Pour commencer, tout passe par e-mail. Chaque message est suivi : envoyé, remis, ouvert ou en échec. Les SMS et WhatsApp pourront être ajoutés plus tard.">
         <select className={champS} value={cible} onChange={(e) => setCible(e.target.value as Statut)} aria-label="Destinataires par statut">
           {STATUTS.map((s) => <option key={s.id} value={s.id}>{s.court} ({db.candidats.filter((c) => c.statut === s.id).length})</option>)}
         </select>
@@ -57,8 +58,8 @@ export default function Communication() {
       <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Chiffre label="Messages envoyés" valeur={stats.total} />
         <Chiffre label="Taux de remise" valeur={`${stats.taux} %`} accent />
-        <Chiffre label="En échec" valeur={stats.echecs} detail={`${echecsUniques.length} numéros à corriger`} />
-        <Chiffre label="Coût estimé" valeur={`${stats.cout.toFixed(2)} $`} detail="Tarifs indicatifs, à confirmer" />
+        <Chiffre label="En échec" valeur={stats.echecs} detail={`${echecsUniques.length} adresses à corriger`} />
+        <Chiffre label="Ouverts" valeur={`${db.messages.filter((m) => m.statut === "lu").length}`} detail="E-mails lus par leur destinataire" />
       </div>
 
       <Onglets<Onglet> actif={onglet} onChange={setOnglet} onglets={[{ id: "campagnes", label: "Campagnes", n: campagnes.length }, { id: "relances", label: "Relances automatiques", n: actions.length }, { id: "reponses", label: "Réponses et échecs", n: reponses.length + echecsUniques.length }, { id: "modeles", label: "Modèles", n: MODELES.length - 1 }]} />
@@ -69,7 +70,7 @@ export default function Communication() {
             <div key={k.nom} className="grid items-center gap-3 p-4 sm:grid-cols-[1.3fr_1fr_auto] sm:px-6">
               <div>
                 <p className="font-bold">{k.nom}</p>
-                <p className="text-xs text-muted">{fmtQuand(k.dernier)} · {[...k.canaux].map((x) => x.toUpperCase()).join(" + ")} · {k.cout.toFixed(2)} $</p>
+                <p className="text-xs text-muted">{fmtQuand(k.dernier)} · {[...k.canaux].map((x) => NOM_CANAL[x as keyof typeof NOM_CANAL]).join(" + ")}</p>
               </div>
               <div>
                 <div className="flex h-2 overflow-hidden rounded-full bg-sand-200">
@@ -104,7 +105,7 @@ export default function Communication() {
           <Card className="h-fit p-5">
             <h2 className="font-bold">Règle d&apos;escalade</h2>
             <ol className="mt-3 space-y-3 text-[13px]">
-              {[["1", "SMS", "3 jours sans réponse"], ["2", "WhatsApp", "2 jours après le SMS"], ["3", "Appel de l'encadreur", "après deux relances sans effet"]].map(([n, t, d]) => (
+              {[["1", "Premier e-mail de relance", "3 jours sans réponse"], ["2", "Second e-mail", "2 jours après le premier"], ["3", "Appel de l'encadreur", "après deux relances sans effet"]].map(([n, t, d]) => (
                 <li key={n} className="flex gap-3"><span className="grid size-6 shrink-0 place-items-center rounded-full bg-brand-600 text-xs font-bold text-white">{n}</span><span><b>{t}</b><br /><span className="text-muted">{d}</span></span></li>
               ))}
             </ol>
@@ -116,26 +117,26 @@ export default function Communication() {
       {onglet === "reponses" && (
         <div className="grid gap-4 lg:grid-cols-2">
           <Card className="p-5">
-            <h2 className="mb-3 font-bold">Réponses reçues par SMS</h2>
-            {!reponses.length && <p className="text-sm text-muted">Aucune réponse pour l&apos;instant. Dans le téléphone de démonstration, répondez « 1 » à une convocation.</p>}
+            <h2 className="mb-3 font-bold">Réponses aux convocations</h2>
+            {!reponses.length && <p className="text-sm text-muted">Aucune réponse pour l&apos;instant. Les élèves confirment leur présence d&apos;un clic depuis le lien reçu par e-mail.</p>}
             <ul className="space-y-2">
-              {reponses.slice(0, 30).map((m) => (
-                <li key={m.id} className="flex items-center justify-between gap-3 text-sm">
-                  <Link href={`/candidats/${m.candidat_id}`} className="font-semibold hover:text-brand-700">{m.nom_destinataire}</Link>
-                  <span className="flex items-center gap-2"><Pastille ton={m.contenu === "1" ? "vert" : "ambre"}>« {m.contenu} »{m.contenu === "1" ? " présence confirmée" : m.contenu === "2" ? " empêchement" : ""}</Pastille><span className="text-xs text-muted">{fmtQuand(m.created_at)}</span></span>
+              {reponses.slice(0, 40).map(({ k, c }) => (
+                <li key={k.id} className="flex items-center justify-between gap-3 text-sm">
+                  <NomELP c={c} />
+                  <Pastille ton={k.confirme ? "vert" : "ambre"}>{k.confirme ? "Viendra" : "Empêché(e)"}</Pastille>
                 </li>
               ))}
             </ul>
           </Card>
           <Card className="p-5">
-            <h2 className="mb-3 font-bold">Numéros en échec</h2>
+            <h2 className="mb-3 font-bold">Adresses en échec</h2>
             {!echecsUniques.length && <p className="text-sm text-muted">Aucun échec de remise.</p>}
             <ul className="space-y-2">
               {echecsUniques.map((m) => {
                 const c = m.candidat_id ? parId.get(m.candidat_id) : null;
                 return (
                   <li key={m.id} className="flex items-center justify-between gap-3 text-sm">
-                    <span><b>{c ? nomComplet(c) : m.nom_destinataire}</b> <span className="tabular text-muted">· {m.telephone}</span></span>
+                    <span><b>{c ? nomComplet(c) : m.nom_destinataire}</b> <span className="text-muted">· {m.contact || "aucune adresse"}</span></span>
                     {c && <Link href={`/candidats/${c.id}`} className="flex items-center gap-1 text-xs font-bold text-brand-600">Corriger <ArrowRight className="size-3" /></Link>}
                   </li>
                 );
@@ -154,7 +155,7 @@ export default function Communication() {
                 <Pastille ton={m.destinataire === "parent" ? "ambre" : m.destinataire === "agence" ? "bleu" : "marque"}>{m.destinataire === "parent" ? "Parent" : m.destinataire === "agence" ? "Chef d'agence" : "Élève"}</Pastille>
               </div>
               <p className="mt-2 text-[13px] leading-relaxed text-muted">{m.texte}</p>
-              <p className="mt-2 text-[11px] text-muted">{m.texte.length} caractères avant variables</p>
+              <p className="mt-1 text-[11px] font-semibold">Objet : {m.objet}</p>
             </Card>
           ))}
         </div>

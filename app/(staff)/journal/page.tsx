@@ -5,7 +5,7 @@ import { Btn, Card, Entete, Onglets, Pastille, champ, cx, toast } from "@/compon
 import { joursDepuis } from "@/lib/logic";
 import { fmtQuand } from "@/lib/modeles";
 import { anonymiser } from "@/lib/ops";
-import { useStore } from "@/lib/store";
+import { useStore, useVue } from "@/lib/store";
 
 type Onglet = "journal" | "acces" | "conservation";
 
@@ -20,7 +20,7 @@ const ACCES: [string, string, string, string, string, string][] = [
 ];
 
 export default function Confidentialite() {
-  const db = useStore((s) => s.db);
+  const db = useVue();
   const role = useStore((s) => s.role);
   const [onglet, setOnglet] = useState<Onglet>("journal");
   const [q, setQ] = useState("");

@@ -1,109 +1,98 @@
 "use client";
-import { CheckCircle2, ShieldCheck } from "lucide-react";
-import Link from "next/link";
+import { Camera, CheckCircle2, Clock, Printer, RefreshCw } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { FeuilleAutorisation } from "@/components/Papier";
 import { BandeauDemo } from "@/components/Shell";
-import { Signature } from "@/components/Signature";
-import { Btn, Logo, champ, cx } from "@/components/ui";
-import { parentDemanderCode, parentLire, parentSigner, type VueParent } from "@/lib/parent";
+import { Btn, Logo, cx } from "@/components/ui";
+import { miniature } from "@/lib/ops";
+import { parentDeposer, parentLire, type VueParent } from "@/lib/parent";
 
-const ENGAGEMENTS = [
-  "J'autorise mon enfant à participer à l'Equity Leaders Program d'EquityBCDC.",
-  "J'autorise mon enfant à séjourner une semaine à l'hôtel pour la formation d'induction, sous la responsabilité des encadreurs.",
-  "J'autorise mon enfant à effectuer un stage de deux mois dans une agence EquityBCDC proche de notre domicile.",
-  "J'accepte que la Fondation Equity utilise les informations du dossier uniquement pour le programme.",
-];
+function Etape({ n, titre, children, fait }: { n: number; titre: string; children: React.ReactNode; fait?: boolean }) {
+  return (
+    <section className={cx("rounded-3xl border p-5", fait ? "border-emerald-200 bg-emerald-50" : "border-sand-200 bg-surface shadow-card")}>
+      <h2 className="flex items-center gap-2.5 font-extrabold"><span className={cx("grid size-7 place-items-center rounded-full text-xs text-white", fait ? "bg-emerald-600" : "bg-brand-600")}>{fait ? <CheckCircle2 className="size-4" /> : n}</span>{titre}</h2>
+      <div className="mt-3 text-sm">{children}</div>
+    </section>
+  );
+}
 
+/** Page du parent : imprimer l'autorisation, la signer à la main, en déposer la photo. */
 export default function PageParent() {
   const { token } = useParams<{ token: string }>();
   const [v, setV] = useState<VueParent | null | undefined>(undefined);
-  const [coches, setCoches] = useState<boolean[]>(ENGAGEMENTS.map(() => false));
-  const [etape, setEtape] = useState<"lire" | "code" | "fini">("lire");
-  const [code, setCode] = useState("");
-  const [demo, setDemo] = useState("");
-  const [signature, setSignature] = useState<string | null>(null);
+  const [apercu, setApercu] = useState<string | null>(null);
+  const [nom, setNom] = useState("");
   const [erreur, setErreur] = useState("");
   const [charge, setCharge] = useState(false);
 
-  const recharger = useCallback(() => parentLire(token).then((x) => { setV(x); if (x?.signe) setEtape("fini"); }), [token]);
+  const recharger = useCallback(() => parentLire(token).then(setV), [token]);
   useEffect(() => { void recharger(); }, [recharger]);
 
-  const demander = async () => {
-    setCharge(true);
-    const r = await parentDemanderCode(token);
-    setCharge(false);
-    if (r.erreur) return setErreur(r.erreur);
-    setDemo(r.demo ?? "");
+  const choisir = async (f?: File) => {
+    if (!f) return;
     setErreur("");
-    setEtape("code");
+    if (!f.type.startsWith("image/")) return setErreur("Merci d'envoyer une photo (JPG ou PNG) du papier signé.");
+    setNom(f.name);
+    setApercu(await miniature(f, 1100).catch(() => null));
   };
-  const signer = async () => {
+  const envoyer = async () => {
     setCharge(true);
-    const err = await parentSigner(token, code, signature!);
+    const err = await parentDeposer(token, nom, apercu!);
     setCharge(false);
     if (err) return setErreur(err);
+    setApercu(null);
     await recharger();
   };
 
+
   return (
-    <div className="min-h-dvh bg-sand-100">
-      <BandeauDemo />
-      <div className="mx-auto min-h-dvh max-w-md bg-sand-50 shadow-pop">
-        <header className="flex items-center gap-3 border-b border-sand-200 bg-white px-5 py-4"><Logo taille={40} /><div className="leading-tight"><p className="font-extrabold">Autorisation parentale</p><p className="text-xs text-muted">EquityBCDC · Equity Leaders Program</p></div></header>
-        <main className="px-5 py-6">
+    <div className="min-h-dvh bg-sand-100 print:bg-white">
+      <div className="no-print"><BandeauDemo /></div>
+      <div className="no-print mx-auto min-h-dvh max-w-md bg-sand-50 shadow-pop">
+        <header className="flex items-center gap-3 border-b border-sand-200 bg-surface px-5 py-4"><Logo taille={44} /><div className="leading-tight"><p className="font-extrabold">Autorisation parentale</p><p className="text-xs text-muted">Equity Leaders Program</p></div></header>
+        <main className="space-y-4 px-5 py-6">
           {v === undefined ? <p className="py-20 text-center text-sm text-muted">Chargement…</p> : v === null ? (
             <div className="py-16 text-center"><p className="text-lg font-bold">Lien invalide</p><p className="mt-1 text-sm text-muted">Ce lien n&apos;existe pas ou a expiré. Demandez-en un nouveau à l&apos;encadreur de votre enfant.</p></div>
-          ) : etape === "fini" ? (
-            <div className="py-8 text-center">
-              <CheckCircle2 className="mx-auto size-16 text-emerald-600" />
-              <h1 className="mt-4 text-2xl font-extrabold">Merci, c&apos;est signé</h1>
-              <p className="mt-2 text-sm text-muted">L&apos;autorisation de {v.prenom} {v.nom} est enregistrée. Vous n&apos;avez plus rien à faire.</p>
-              <div className="mt-6 rounded-2xl bg-white p-4 ring-1 ring-sand-200"><p className="text-xs font-semibold text-muted">Code de vérification du document</p><p className="tabular mt-1 text-xl font-extrabold tracking-wider">{v.code_verification}</p></div>
-              <Link href={`/doc/autorisation/${v.candidat_id}`} className="mt-5 inline-block text-sm font-bold text-brand-600">Voir le document signé</Link>
-            </div>
+          ) : v.statut === "valide" ? (
+            <div className="py-10 text-center"><CheckCircle2 className="mx-auto size-16 text-emerald-600" /><h1 className="mt-4 text-2xl font-extrabold">Autorisation validée</h1><p className="mt-2 text-sm text-muted">L&apos;autorisation de {v.prenom} {v.nom} a été vérifiée par un encadreur. Vous n&apos;avez plus rien à faire. Merci !</p></div>
+          ) : v.statut === "recu" ? (
+            <div className="py-10 text-center"><Clock className="mx-auto size-16 text-gold-500" /><h1 className="mt-4 text-2xl font-extrabold">Bien reçu, merci</h1><p className="mt-2 text-sm text-muted">Un encadreur va vérifier l&apos;autorisation de {v.prenom}. Vous serez prévenu(e) s&apos;il faut la renvoyer.</p><button className="mt-5 inline-flex items-center gap-1.5 text-sm font-bold text-brand-600" onClick={() => setV({ ...v, statut: "en_attente" })}><RefreshCw className="size-4" /> Envoyer une autre photo</button></div>
           ) : (
             <>
-              <p className="text-sm text-muted">Bonjour {v.parent_nom || "cher parent"},</p>
-              <h1 className="mt-1 text-2xl leading-tight font-extrabold">Votre enfant {v.prenom} {v.nom} est sélectionné(e) pour le programme ELP.</h1>
-              <p className="mt-2 text-sm text-muted">{v.cohorte}. Pour qu&apos;il ou elle puisse participer, nous avons besoin de votre accord. Cela prend deux minutes.</p>
-
-              {etape === "lire" && (
-                <>
-                  <div className="mt-6 space-y-2.5">
-                    {ENGAGEMENTS.map((e, i) => (
-                      <label key={i} className={cx("flex gap-3 rounded-2xl border-2 p-4 text-sm leading-relaxed transition", coches[i] ? "border-emerald-300 bg-emerald-50" : "border-sand-200 bg-white")}>
-                        <input type="checkbox" className="mt-0.5 size-5 shrink-0 accent-emerald-600" checked={coches[i]} onChange={(ev) => setCoches(coches.map((c, j) => (j === i ? ev.target.checked : c)))} />
-                        {e}
-                      </label>
-                    ))}
-                  </div>
-                  {erreur && <p role="alert" className="mt-3 text-sm font-semibold text-rose-700">{erreur}</p>}
-                  <Btn className="mt-6 w-full py-3.5" disabled={!coches.every(Boolean) || charge} onClick={demander}>{charge ? "Envoi du code…" : "Recevoir mon code par SMS"}</Btn>
-                  <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-muted"><ShieldCheck className="size-4" /> Le code est envoyé au {v.parent_telephone.replace(/\d(?=(?:\D*\d){3})/g, "•")}</p>
-                </>
-              )}
-
-              {etape === "code" && (
-                <div className="mt-6 space-y-5">
-                  <div>
-                    <label htmlFor="code" className="mb-1.5 block text-sm font-bold">1. Entrez le code reçu par SMS</label>
-                    <input id="code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} className={cx(champ, "tabular py-3.5 text-center text-2xl font-extrabold tracking-[0.4em]")} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} placeholder="••••••" />
-                    {demo && <p className="mt-2 rounded-xl bg-gold-100 px-3 py-2 text-xs font-semibold text-gold-700">Démonstration : le SMS n&apos;est pas réellement envoyé. Code : <button className="tabular font-extrabold underline" onClick={() => setCode(demo)}>{demo}</button></p>}
-                    <button className="mt-2 text-xs font-bold text-brand-600" onClick={demander}>Renvoyer un code</button>
-                  </div>
-                  <div>
-                    <p className="mb-1.5 text-sm font-bold">2. Signez avec votre doigt</p>
-                    <Signature onChange={setSignature} />
-                  </div>
-                  {erreur && <p role="alert" className="rounded-xl bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{erreur}</p>}
-                  <Btn className="w-full py-3.5" disabled={code.length !== 6 || !signature || charge} onClick={signer}>{charge ? "Enregistrement…" : "Signer l'autorisation"}</Btn>
-                </div>
-              )}
+              <div>
+                <p className="text-sm text-muted">Bonjour {v.parent_nom || "cher parent"},</p>
+                <h1 className="mt-1 text-2xl leading-tight font-extrabold">{v.prenom} {v.nom} est retenu(e) pour le programme ELP d&apos;EquityBCDC.</h1>
+                <p className="mt-2 text-sm text-muted">Pour qu&apos;il ou elle puisse participer, nous avons besoin de votre autorisation signée à la main. Trois étapes :</p>
+              </div>
+              {v.statut === "rejete" && <p role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-700">La photo précédente n&apos;a pas pu être acceptée : {v.motif_rejet || "document illisible"}. Merci de la refaire.</p>}
+              <Etape n={1} titre="Imprimez l'autorisation">
+                <p className="text-muted">Le document est déjà rempli au nom de votre enfant. Pas d&apos;imprimante ? Un cybercafé peut l&apos;imprimer, ou l&apos;encadreur peut vous en remettre un exemplaire.</p>
+                <Btn className="mt-3 w-full" variante="secondaire" onClick={() => window.print()}><Printer className="size-4" /> Imprimer le document</Btn>
+              </Etape>
+              <Etape n={2} titre="Signez-le à la main">
+                <p className="text-muted">Écrivez « lu et approuvé », la date, votre nom, puis signez dans le cadre prévu.</p>
+              </Etape>
+              <Etape n={3} titre="Envoyez la photo du papier signé">
+                {apercu ? (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={apercu} alt="Aperçu du document signé" className="max-h-80 w-full rounded-xl border border-sand-200 object-contain" />
+                    <p className="mt-2 text-xs text-muted">La signature est-elle bien lisible ? Sinon, reprenez la photo.</p>
+                  </>
+                ) : <p className="text-muted">Posez la feuille bien à plat, à la lumière, et cadrez toute la page.</p>}
+                <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-sand-300 py-3 text-sm font-bold text-brand-600">
+                  <Camera className="size-4" /> {apercu ? "Reprendre la photo" : "Prendre ou choisir la photo"}
+                  <input type="file" accept="image/*" capture="environment" hidden onChange={(e) => choisir(e.target.files?.[0])} />
+                </label>
+                {erreur && <p role="alert" className="mt-2 text-sm font-semibold text-rose-700">{erreur}</p>}
+                {apercu && <Btn className="mt-3 w-full py-3.5" disabled={charge} onClick={envoyer}>{charge ? "Envoi…" : "Envoyer l'autorisation signée"}</Btn>}
+              </Etape>
             </>
           )}
         </main>
       </div>
+      {v && <div className="hidden print:block"><FeuilleAutorisation d={v} /></div>}
     </div>
   );
 }

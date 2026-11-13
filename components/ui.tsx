@@ -8,24 +8,23 @@ import { statutInfo, type Statut } from "@/lib/types";
 export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
 
 /**
- * Marque EquityBCDC : le toit du logo officiel et le nom de la banque.
- * Provisoire : à remplacer par le fichier officiel du logo EquityBCDC
- * (déposer l'image dans public/brand/ et l'afficher ici).
+ * Logo officiel EquityBCDC. À l'écran il est posé sur une pastille blanche (il
+ * contient du noir, illisible sur fond sombre). Sur les documents à imprimer,
+ * `nu` l'affiche directement sur la page, sans cadre.
  */
-export function Logo({ taille = 44, className }: { taille?: number; className?: string }) {
+export function Logo({ taille = 44, className, nu }: { taille?: number; className?: string; nu?: boolean }) {
+  const image = <Image src="/brand/equitybcdc.png" alt="EquityBCDC" width={445} height={203} priority style={{ height: nu ? taille : taille * 0.66, width: "auto" }} />;
+  if (nu) return <span className={cx("inline-block shrink-0", className)}>{image}</span>;
   return (
-    <span className={cx("inline-flex shrink-0 flex-col items-center justify-center rounded-xl bg-white ring-1 ring-black/5", className)} style={{ height: taille, padding: `0 ${taille * 0.2}px` }} role="img" aria-label="EquityBCDC">
-      <Image src="/brand/toit.png" alt="" width={172} height={61} priority style={{ height: taille * 0.4, width: "auto" }} />
-      <span className="leading-none font-extrabold tracking-tight text-ink" style={{ fontSize: taille * 0.27, marginTop: taille * 0.05 }}>
-        EQUITY<span className="text-brand-600">BCDC</span>
-      </span>
+    <span className={cx("inline-flex shrink-0 items-center justify-center rounded-xl bg-white", className)} style={{ height: taille, padding: `0 ${taille * 0.24}px` }}>
+      {image}
     </span>
   );
 }
 
 export function Card({ children, className, ...p }: { children: ReactNode; className?: string } & React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cx("rounded-2xl border border-sand-200 bg-white shadow-card", className)} {...p}>
+    <div className={cx("rounded-2xl border border-sand-200 bg-surface shadow-card", className)} {...p}>
       {children}
     </div>
   );
@@ -34,9 +33,9 @@ export function Card({ children, className, ...p }: { children: ReactNode; class
 type Variante = "primaire" | "secondaire" | "discret" | "danger" | "or";
 const VAR: Record<Variante, string> = {
   primaire: "bg-brand-600 text-white hover:bg-brand-700 shadow-sm shadow-brand-900/20",
-  secondaire: "bg-white text-ink border border-sand-300 hover:bg-sand-100",
+  secondaire: "bg-surface text-ink border border-sand-300 hover:bg-sand-100",
   discret: "text-muted hover:bg-sand-100 hover:text-ink",
-  danger: "bg-white text-rose-700 border border-rose-200 hover:bg-rose-50",
+  danger: "bg-surface text-rose-700 border border-rose-200 hover:bg-rose-50",
   or: "bg-gold-500 text-white hover:bg-gold-700",
 };
 
@@ -98,7 +97,7 @@ export function Onglets<T extends string>({ onglets, actif, onChange }: { onglet
   return (
     <div className="scroll-fin mb-5 flex gap-1 overflow-x-auto rounded-xl bg-sand-100 p-1" role="tablist">
       {onglets.map((o) => (
-        <button key={o.id} role="tab" aria-selected={actif === o.id} onClick={() => onChange(o.id)} className={cx("flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold whitespace-nowrap transition", actif === o.id ? "bg-white text-ink shadow-sm" : "text-muted hover:text-ink")}>
+        <button key={o.id} role="tab" aria-selected={actif === o.id} onClick={() => onChange(o.id)} className={cx("flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold whitespace-nowrap transition", actif === o.id ? "bg-surface text-ink shadow-sm" : "text-muted hover:text-ink")}>
           {o.label}
           {o.n != null && <span className={cx("tabular rounded-full px-1.5 text-[11px]", actif === o.id ? "bg-brand-50 text-brand-700" : "bg-sand-200")}>{o.n}</span>}
         </button>
@@ -117,7 +116,7 @@ export function Modale({ ouvert, onClose, titre, children, large }: { ouvert: bo
   if (!ouvert) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-brand-950/50 p-0 backdrop-blur-sm sm:items-center sm:p-6" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-modal aria-label={titre} className={cx("animate-in flex max-h-[92dvh] w-full flex-col rounded-t-3xl bg-white shadow-pop sm:rounded-3xl", large ? "sm:max-w-3xl" : "sm:max-w-lg")}>
+      <div role="dialog" aria-modal aria-label={titre} className={cx("animate-in flex max-h-[92dvh] w-full flex-col rounded-t-3xl bg-surface shadow-pop sm:rounded-3xl", large ? "sm:max-w-3xl" : "sm:max-w-lg")}>
         <div className="flex items-center justify-between gap-4 border-b border-sand-200 px-6 py-4">
           <h2 className="text-lg font-bold">{titre}</h2>
           <button onClick={onClose} aria-label="Fermer" className="rounded-lg p-1.5 text-muted hover:bg-sand-100">
@@ -130,7 +129,7 @@ export function Modale({ ouvert, onClose, titre, children, large }: { ouvert: bo
   );
 }
 
-const champBase = "rounded-xl border border-sand-300 bg-white px-3.5 py-2.5 text-sm outline-none transition placeholder:text-muted/60 focus:border-brand-500 focus:ring-4 focus:ring-brand-100";
+const champBase = "rounded-xl border border-sand-300 bg-surface px-3.5 py-2.5 text-sm outline-none transition placeholder:text-muted/60 focus:border-brand-500 focus:ring-4 focus:ring-brand-100";
 export const champ = `w-full ${champBase}`;
 /** Variante à largeur automatique (filtres, listes déroulantes en ligne). */
 export const champS = `w-auto ${champBase}`;
@@ -157,7 +156,7 @@ export function Vide({ titre, detail, children }: { titre: string; detail?: stri
 
 export function Chiffre({ label, valeur, detail, accent }: { label: string; valeur: ReactNode; detail?: ReactNode; accent?: boolean }) {
   return (
-    <Card className={cx("p-5", accent && "border-brand-200 bg-gradient-to-br from-brand-50 to-white")}>
+    <Card className={cx("p-5", accent && "border-brand-200 bg-gradient-to-br from-brand-50 to-surface")}>
       <p className="text-[13px] font-semibold text-muted">{label}</p>
       <p className="tabular mt-1 text-3xl font-extrabold tracking-tight">{valeur}</p>
       {detail && <div className="mt-1 text-xs text-muted">{detail}</div>}
@@ -194,7 +193,7 @@ export function Toasts() {
   return (
     <div className="no-print pointer-events-none fixed inset-x-0 bottom-4 z-[70] flex flex-col items-center gap-2 px-4" aria-live="polite">
       {items.map((t) => (
-        <div key={t.id} className={cx("animate-in pointer-events-auto max-w-md rounded-2xl px-4 py-3 text-sm font-medium text-white shadow-pop", t.ton === "ok" ? "bg-ink" : "bg-rose-700")}>
+        <div key={t.id} className={cx("animate-in pointer-events-auto max-w-md rounded-2xl px-4 py-3 text-sm font-medium text-white shadow-pop", t.ton === "ok" ? "bg-nuit ring-1 ring-white/10" : "bg-rose-600")}>
           {t.texte}
         </div>
       ))}
