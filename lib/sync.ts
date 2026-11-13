@@ -4,17 +4,20 @@
 // Principe : on lit et on écrit toujours en local ; les écritures partent dans
 // une file d'attente qui se vide dès que le réseau est disponible.
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { SUPABASE_ACTIF, useStore } from "./store";
+import { SUPABASE_ACTIF, useStore, type Op } from "./store";
 import { TABLES, type DB, type Role, type Table } from "./types";
 
-let client: SupabaseClient | null = null;
-export function supabase(): SupabaseClient | null {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Client = SupabaseClient<any, any, "elp">;
+let client: Client | null = null;
+export function supabase(): Client | null {
   if (!SUPABASE_ACTIF) return null;
-  client ??= createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+  // Tout ELP Hub vit dans le schéma « elp » du projet, séparé du reste.
+  client ??= createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { db: { schema: "elp" } });
   return client;
 }
 
-async function lireTout(sb: SupabaseClient, table: Table): Promise<unknown[]> {
+async function lireTout(sb: Client, table: Table): Promise<unknown[]> {
   const rows: unknown[] = [];
   for (let de = 0; ; de += 1000) {
     const { data, error } = await sb.from(table).select("*").order("id").range(de, de + 999);
@@ -43,19 +46,54 @@ export async function tirer(): Promise<void> {
   useStore.getState().set({ derniereSync: new Date().toISOString() });
 }
 
+/** Écritures de l'élève connecté par son lien : chaque ligne passe par elp_candidat_ecrire, qui contrôle tout. */
+async function ecrireParLien(sb: Client, jeton: string, op: Op): Promise<{ error: { code?: string; message: string } | null }> {
+  if (op.type === "delete") return { error: null };
+  for (const row of op.rows ?? []) {
+    const { data, error } = await sb.rpc("elp_candidat_ecrire", { p_token: jeton, p_table: op.table, p_row: row });
+    if (error) return { error };
+    if (data) console.warn("Écriture refusée :", data);
+  }
+  return { error: null };
+}
+
+/** Ouvre l'espace d'un élève arrivé par son lien personnel. Renvoie l'identifiant du dossier, ou null. */
+export async function chargerParLien(jeton: string): Promise<string | null> {
+  const sb = supabase();
+  if (!sb) return null;
+  const { data, error } = await sb.rpc("elp_candidat_charger", { p_token: jeton });
+  if (error || !data) return null;
+  const db = { cohortes: [], candidats: [], documents: [], centres: [], sessions_test: [], convocations: [], notes: [], agences: [], affectations: [], chapitres: [], presences: [], messages: [], journal: [], ...(data as Partial<DB>) } as DB;
+  const id = db.candidats[0]?.id ?? null;
+  useStore.getState().charger(db);
+  useStore.getState().set({ role: "candidat", jeton, moiId: id, derniereSync: new Date().toISOString() });
+  return id;
+}
+
 let enCours = false;
+let encore = false;
 /** Vide la file d'attente des écritures. Sans réseau, on réessaiera plus tard. */
 export async function pousser(): Promise<void> {
   const sb = supabase();
-  if (!sb || enCours || (typeof navigator !== "undefined" && !navigator.onLine)) return;
+  if (!sb || (typeof navigator !== "undefined" && !navigator.onLine)) return;
+  // Une écriture arrivée pendant l'envoi en cours sera envoyée juste après, sans attendre.
+  if (enCours) {
+    encore = true;
+    return;
+  }
   enCours = true;
+  let bloque = false;
   try {
     while (useStore.getState().outbox.length) {
       const op = useStore.getState().outbox[0];
-      const { error } = op.type === "upsert" ? await sb.from(op.table).upsert(op.rows as object[]) : await sb.from(op.table).delete().in("id", op.ids!);
+      const jeton = useStore.getState().jeton;
+      const { error } = jeton
+        ? await ecrireParLien(sb, jeton, op)
+        : op.type === "upsert" ? await sb.from(op.table).upsert(op.rows as object[]) : await sb.from(op.table).delete().in("id", op.ids!);
       // Écriture refusée par les règles d'accès (42501) : inutile de réessayer, le serveur a le dernier mot.
       if (error && error.code !== "42501") {
         console.warn("Synchronisation en attente :", error.message);
+        bloque = true;
         break;
       }
       useStore.getState().set({ outbox: useStore.getState().outbox.slice(1) });
@@ -63,6 +101,10 @@ export async function pousser(): Promise<void> {
     if (!useStore.getState().outbox.length) useStore.getState().set({ derniereSync: new Date().toISOString() });
   } finally {
     enCours = false;
+    if (encore && !bloque) {
+      encore = false;
+      void pousser();
+    }
   }
 }
 
@@ -80,7 +122,7 @@ export async function connexion(email: string, motDePasse: string): Promise<stri
 
 export async function deconnexion(): Promise<void> {
   await supabase()?.auth.signOut();
-  useStore.getState().set({ role: null, moiId: null, agenceId: null });
+  useStore.getState().set({ role: null, moiId: null, jeton: null, agenceId: null });
 }
 
 /** À appeler une fois au démarrage : synchronise au retour du réseau et toutes les 20 s. */

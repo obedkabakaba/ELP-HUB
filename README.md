@@ -63,16 +63,18 @@ lib/seed.ts      trois cohortes fictives
 
 ### Brancher Supabase
 
-1. Appliquer les migrations du dépôt **ELP-HUB-BAKEND** sur un projet Supabase.
-2. Copier `.env.example` en `.env.local` et renseigner l'URL et la clé publique.
-3. L'accueil devient un écran de connexion ; le rôle vient de la table `profils`.
+ELP Hub est hébergé dans le projet Supabase d'Ardoise (**ardoise-instagram**), dans un schéma `elp` bien séparé : voir le dépôt **ELP-HUB-BAKEND**.
 
-Le mode démonstration est testé de bout en bout dans un navigateur, et la base est testée de son côté, mais **la liaison entre les deux n'a pas encore été essayée sur un vrai projet Supabase**.
+1. Copier `.env.example` en `.env.local` et renseigner `NEXT_PUBLIC_SUPABASE_URL=https://bskbsadlhzduefzubodj.supabase.co` et la clé publique du projet.
+2. L'accueil devient un écran de connexion pour les encadreurs ; leur rôle vient de `elp.profils`.
+3. Élèves et parents n'ont pas de compte : leur lien personnel (`/moi?t=…`, `/p/…`) suffit.
+
+Le mode démonstration est testé de bout en bout dans un navigateur (26 parcours). Le mode réel a été testé contre les vraies migrations sur une base locale (élève et parent par lien, 10 parcours) ; il reste à l'essayer sur le projet Supabase en ligne.
 
 ## À vérifier avant un pilote
 
 - La liste et les positions des agences sont des **exemples** : à remplacer par la liste officielle (import Excel possible).
 - Montant de l'indemnité et programme d'induction sont des valeurs d'exemple.
-- Les e-mails partiront par Resend depuis le domaine déjà vérifié d'Ardoise (voir ELP-HUB-BAKEND).
+- Les e-mails partent par Resend depuis myardoise.com, le domaine déjà vérifié d'Ardoise (voir ELP-HUB-BAKEND).
 - Durée de conservation et consentement des mineurs : à valider avec le service juridique (Code du numérique, 2023).
 - Le logo EquityBCDC vient de l'icône publique de l'application de la banque ; son usage reste soumis à l'accord d'EquityBCDC et de la Fondation.
