@@ -12,11 +12,14 @@ export type Statut =
   | "stage"
   | "termine"
   | "non_retenu"
-  | "desiste";
+  | "desiste"
+  | "exclu";
 
 export type Role = "admin" | "encadreur" | "centre" | "agence" | "candidat";
 export type Sexe = "F" | "M";
-export type Canal = "sms" | "whatsapp" | "email";
+export type Canal = "email" | "sms" | "whatsapp";
+/** Canaux ouverts pour l'instant : on démarre par l'e-mail seul. SMS et WhatsApp viendront ensuite. */
+export const CANAUX_ACTIFS: Canal[] = ["email"];
 
 export interface Cohorte {
   id: string;
@@ -25,6 +28,8 @@ export interface Cohorte {
   seuil_exetat: number;
   places: number;
   taille_attente: number;
+  /** Part des places réservée aux filles, en %. null = pas de quota, classement aux seules notes. */
+  quota_filles: number | null;
   statut: "active" | "archivee";
   created_at: string;
 }
@@ -43,15 +48,19 @@ export interface Candidat {
   ecole: string;
   section: string;
   pourcentage_exetat: number;
+  province: string;
   commune: string;
   adresse: string;
   lat: number | null;
   lng: number | null;
+  universite: string;
+  chapitre_id: string | null;
   statut: Statut;
   statut_depuis: string;
   parent_nom: string;
   parent_lien: string;
   parent_telephone: string;
+  parent_email: string;
   parent_token: string;
   token: string; // lien personnel d'inscription
   allergies: string;
@@ -62,7 +71,9 @@ export interface Candidat {
   inscrit_le: string | null;
   derniere_activite: string | null;
   relances: number;
-  telephone_invalide: boolean;
+  contact_invalide: boolean; // les e-mails ne lui parviennent pas
+  motif_sortie: string; // pourquoi il a quitté le programme (exclusion, désistement)
+  sorti_le: string | null;
   chambre: string | null;
   compte_ouvert: boolean; // simple indicateur : aucune donnée bancaire n'est stockée
   note_interne: string;
@@ -76,17 +87,14 @@ export interface DocumentRow {
   id: string;
   candidat_id: string;
   type: TypeDocument;
-  statut: "recu" | "valide" | "rejete" | "en_attente" | "signe";
+  /** Autorisation : en_attente (à imprimer et signer) → recu (photo déposée) → valide ou rejete. */
+  statut: "recu" | "valide" | "rejete" | "en_attente";
   nom_fichier: string;
-  apercu: string | null; // miniature (data URL) — en production : chemin Supabase Storage
+  apercu: string | null; // image réduite (data URL) — en production : chemin Supabase Storage
   motif_rejet: string;
-  signe_par: string;
-  signe_le: string | null;
-  signature: string | null;
-  code_verification: string;
-  empreinte: string; // SHA-256 du contenu signé
-  otp: string | null;
-  otp_expire_le: string | null;
+  depose_par: string; // « élève », « parent » ou nom de l'encadreur
+  code_verification: string; // imprimé sur l'autorisation pour la rattacher au bon dossier
+  valide_le: string | null;
   created_at: string;
 }
 
@@ -94,6 +102,7 @@ export interface Centre {
   id: string;
   nom: string;
   type: "test" | "hotel";
+  province: string;
   commune: string;
   adresse: string;
   lat: number;
@@ -129,12 +138,14 @@ export interface Note {
 export interface Agence {
   id: string;
   nom: string;
+  province: string;
   commune: string;
   adresse: string;
   lat: number;
   lng: number;
   capacite: number;
   chef_nom: string;
+  chef_email: string;
   chef_telephone: string;
   position_verifiee: boolean;
 }
@@ -159,6 +170,18 @@ export interface Affectation {
   evaluation: Evaluation | null;
   evalue_le: string | null;
   indemnite_payee: boolean;
+  /** Agences précédentes, quand le stagiaire a changé d'agence en cours de stage. */
+  historique: { agence_id: string; jusqu_au: string; motif: string }[];
+}
+
+/** Regroupement d'ELP par université ou par lieu, créé librement par les encadreurs. */
+export interface Chapitre {
+  id: string;
+  nom: string;
+  type: "universite" | "lieu" | "autre";
+  province: string;
+  description: string;
+  created_at: string;
 }
 
 export interface Presence {
@@ -177,9 +200,10 @@ export interface Message {
   candidat_id: string | null;
   destinataire: "candidat" | "parent" | "agence";
   nom_destinataire: string;
-  telephone: string;
+  contact: string; // adresse e-mail (ou numéro, quand les SMS seront ouverts)
   canal: Canal;
   modele: string;
+  objet: string;
   contenu: string;
   lien: string | null;
   statut: "file" | "envoye" | "livre" | "lu" | "echec";
@@ -206,6 +230,7 @@ export interface DB {
   notes: Note[];
   agences: Agence[];
   affectations: Affectation[];
+  chapitres: Chapitre[];
   presences: Presence[];
   messages: Message[];
   journal: Journal[];
@@ -216,6 +241,7 @@ export const TABLES: Table[] = [
   "cohortes",
   "centres",
   "agences",
+  "chapitres",
   "candidats",
   "documents",
   "sessions_test",
@@ -236,10 +262,14 @@ export const STATUTS: { id: Statut; label: string; court: string; couleur: strin
   { id: "attente", label: "Liste d'attente", court: "Attente", couleur: "#d97706", etape: 5 },
   { id: "induction", label: "Induction", court: "Induction", couleur: "#ea580c", etape: 6 },
   { id: "stage", label: "En stage", court: "Stage", couleur: "#a32a29", etape: 7 },
-  { id: "termine", label: "Terminé", court: "Terminés", couleur: "#166534", etape: 7 },
+  { id: "termine", label: "Terminé", court: "Terminés", couleur: "#166534", etape: 8 },
   { id: "non_retenu", label: "Non retenu", court: "Non retenus", couleur: "#a8a29e", etape: 5 },
   { id: "desiste", label: "Désisté", court: "Désistés", couleur: "#e11d48", etape: 0 },
+  { id: "exclu", label: "Retiré du programme", court: "Retirés", couleur: "#78716c", etape: 0 },
 ];
+/** Sortis du parcours : on ne les compte plus, mais leur trace reste consultable. */
+export const SORTIS: Statut[] = ["non_retenu", "desiste", "exclu"];
+export const estSorti = (s: Statut) => SORTIS.includes(s);
 export const statutInfo = (s: Statut) => STATUTS.find((x) => x.id === s)!;
 
 export const ETAPES = [
@@ -247,15 +277,16 @@ export const ETAPES = [
   { n: 2, titre: "Inscriptions", detail: "Les élèves remplissent leur dossier" },
   { n: 3, titre: "Convocations", detail: "Lieu, date et heure du test envoyés" },
   { n: 4, titre: "Tests", detail: "Émargement par QR code et notes importées" },
-  { n: 5, titre: "Sélection", detail: "Classement validé, autorisations parentales en cours" },
+  { n: 5, titre: "Sélection", detail: "Classement validé, dossiers à compléter et autorisations à signer" },
   { n: 6, titre: "Induction", detail: "Semaine de formation à l'hôtel" },
   { n: 7, titre: "Stage", detail: "Deux mois dans les agences EquityBCDC" },
+  { n: 8, titre: "Terminé", detail: "Stage achevé, les ELP rejoignent leur chapitre" },
 ];
 
 export const ROLES: { id: Role; label: string; acteur: string; accueil: string; description: string }[] = [
   { id: "encadreur", label: "Encadreur", acteur: "Mme Nadine K. (encadreure)", accueil: "/tableau", description: "Suit les dossiers, relance, convoque, affecte." },
   { id: "admin", label: "Admin Fondation", acteur: "Admin national EGF", accueil: "/tableau", description: "Vue nationale, rapports, journal des accès." },
-  { id: "candidat", label: "Candidat / ELP", acteur: "Candidat", accueil: "/moi", description: "Inscription, convocation, pointage — sur téléphone." },
+  { id: "candidat", label: "Candidat / ELP", acteur: "Candidat", accueil: "/moi", description: "Inscription, convocation, dossier, pointage, sur téléphone." },
   { id: "centre", label: "Centre de test", acteur: "Responsable de centre", accueil: "/scan", description: "Scanne les QR codes à l'entrée." },
   { id: "agence", label: "Chef d'agence", acteur: "Chef d'agence", accueil: "/agence", description: "Voit ses stagiaires et les évalue." },
 ];

@@ -35,7 +35,7 @@ export default function EspaceAgence() {
   return (
     <div className="min-h-dvh">
       <BandeauDemo />
-      <header className="motif-toit bg-brand-950 text-white">
+      <header className="motif bg-brand-950 text-white">
         <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
           <div className="flex items-center gap-3">
             <Link href="/" aria-label="Accueil" className="rounded-lg p-1.5 hover:bg-white/10"><ArrowLeft className="size-5" /></Link>

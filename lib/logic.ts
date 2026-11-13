@@ -3,29 +3,42 @@ import { distanceKm, position } from "./geo";
 import type { Agence, Candidat, DocumentRow, Sexe } from "./types";
 
 /* ---------- Complétude du dossier ---------- */
+// Deux temps : à l'inscription on demande peu de choses ; le dossier complet
+// (adresse, pièces, autorisation…) n'est exigé que des élèves retenus après le test.
 
 export interface Completude {
   pct: number;
   manquants: string[];
+  phase: 1 | 2;
 }
 
+const RETENUS = ["selectionne", "induction", "stage", "termine"];
+export const estRetenu = (statut: string) => RETENUS.includes(statut);
+
 export function completude(c: Candidat, docs: DocumentRow[]): Completude {
-  const a = (type: string) => docs.some((d) => d.candidat_id === c.id && d.type === type && d.statut !== "rejete");
-  const points: [boolean, string][] = [
+  const a = (type: string, valide = false) => docs.some((d) => d.candidat_id === c.id && d.type === type && (valide ? d.statut === "valide" || d.statut === "recu" : d.statut !== "rejete" && d.statut !== "en_attente"));
+  const phase1: [boolean, string][] = [
     [!!c.date_naissance, "date de naissance"],
-    [!!c.telephone && !c.telephone_invalide, "téléphone valide"],
+    [!!c.email && !c.contact_invalide, "adresse e-mail valide"],
+    [!!c.telephone, "téléphone"],
     [!!c.ecole && !!c.section, "école et section"],
-    [!!c.commune && !!c.adresse, "adresse"],
-    [c.lat != null && c.lng != null, "position GPS du domicile"],
-    [!!c.parent_nom && !!c.parent_telephone, "parent ou tuteur"],
+    [!!c.province && !!c.commune, "province et commune"],
+    [!!c.parent_nom && (!!c.parent_telephone || !!c.parent_email), "parent ou tuteur"],
+    [!!c.consentement_le, "consentement"],
+  ];
+  const phase2: [boolean, string][] = [
+    [!!c.adresse, "adresse complète"],
+    [c.lat != null && c.lng != null, "position du domicile"],
     [!!c.urgence_nom && !!c.urgence_telephone, "contact d'urgence"],
     [a("photo"), "photo d'identité"],
     [a("bulletin"), "bulletin de l'Exetat"],
     [a("identite"), "pièce d'identité"],
-    [!!c.consentement_le, "consentement"],
+    [a("autorisation", true), "autorisation parentale signée"],
   ];
+  const phase: 1 | 2 = estRetenu(c.statut) ? 2 : 1;
+  const points = phase === 2 ? [...phase1, ...phase2] : phase1;
   const ok = points.filter(([v]) => v).length;
-  return { pct: Math.round((ok / points.length) * 100), manquants: points.filter(([v]) => !v).map(([, l]) => l) };
+  return { pct: Math.round((ok / points.length) * 100), manquants: points.filter(([v]) => !v).map(([, l]) => l), phase };
 }
 
 /* ---------- Sélection avec parité ---------- */
@@ -48,30 +61,48 @@ export interface ResultatSelection {
   sortisParParite: string[]; // dans le top au mérite seul, mais hors sélection
 }
 
-export function simulerSelection(liste: Classe[], places: number, tailleAttente: number, noteMin: number): ResultatSelection {
+/**
+ * Classe les candidats notés et répartit les places.
+ * `quotaFilles` = part des places réservée aux filles, en % (50 = parité).
+ * `null` = pas de quota : classement aux seules notes.
+ */
+export function simulerSelection(liste: Classe[], places: number, tailleAttente: number, noteMin: number, quotaFilles: number | null = 50): ResultatSelection {
   const tri = (s: Sexe) => liste.filter((c) => c.sexe === s && c.total >= noteMin).sort((a, b) => b.total - a.total);
   const F = tri("F");
   const M = tri("M");
-  const moitie = Math.floor(places / 2);
-  let nF = Math.min(moitie, F.length);
-  let nM = Math.min(places - moitie, M.length);
-  // S'il manque des candidats d'un côté, les places restantes vont à l'autre.
-  let reste = places - nF - nM;
-  const plusF = Math.min(reste, F.length - nF);
-  nF += plusF;
-  reste -= plusF;
-  nM += Math.min(reste, M.length - nM);
+  let nF: number;
+  let nM: number;
+  if (quotaFilles == null) {
+    const top = [...F, ...M].sort((a, b) => b.total - a.total).slice(0, places);
+    nF = top.filter((c) => c.sexe === "F").length;
+    nM = top.length - nF;
+  } else {
+    const pourFilles = Math.round((places * quotaFilles) / 100);
+    nF = Math.min(pourFilles, F.length);
+    nM = Math.min(places - pourFilles, M.length);
+    // S'il manque des candidats d'un côté, les places restantes vont à l'autre.
+    let reste = places - nF - nM;
+    const plusF = Math.min(reste, F.length - nF);
+    nF += plusF;
+    reste -= plusF;
+    nM += Math.min(reste, M.length - nM);
+  }
 
   const selF = F.slice(0, nF);
   const selM = M.slice(0, nM);
   const selectionnes = [...selF, ...selM].sort((a, b) => b.total - a.total).map((c) => c.id);
 
-  const attF = F.slice(nF, nF + Math.ceil(tailleAttente / 2));
-  const attM = M.slice(nM, nM + Math.floor(tailleAttente / 2));
   const attente: string[] = [];
-  for (let i = 0; i < Math.max(attF.length, attM.length); i++) {
-    if (attF[i]) attente.push(attF[i].id);
-    if (attM[i]) attente.push(attM[i].id);
+  if (quotaFilles == null) {
+    const suite = [...F.slice(nF), ...M.slice(nM)].sort((a, b) => b.total - a.total).slice(0, tailleAttente);
+    attente.push(...suite.map((c) => c.id));
+  } else {
+    const attF = F.slice(nF, nF + Math.ceil(tailleAttente / 2));
+    const attM = M.slice(nM, nM + Math.floor(tailleAttente / 2));
+    for (let i = 0; i < Math.max(attF.length, attM.length); i++) {
+      if (attF[i]) attente.push(attF[i].id);
+      if (attM[i]) attente.push(attM[i].id);
+    }
   }
 
   const pris = new Set([...selectionnes, ...attente]);
@@ -161,6 +192,8 @@ function dist(c: Candidat, a: Agence): number {
   const p = position(c);
   return p ? distanceKm(p[0], p[1], a.lat, a.lng) : 15;
 }
+/** Coût d'une affectation : la distance, avec une forte pénalité hors de la province du stagiaire. */
+const cout1 = (c: Candidat, a: Agence) => dist(c, a) + (c.province && a.province && c.province !== a.province ? 5000 : 0);
 
 /**
  * Propose pour chaque stagiaire une agence, en minimisant la distance totale
@@ -174,10 +207,11 @@ export function proposerAffectations(stagiaires: Candidat[], agences: Agence[], 
     for (let i = 0; i < libres; i++) places.push(a);
   }
   const cols = Math.max(places.length, stagiaires.length);
-  const cout = stagiaires.map((c) => Array.from({ length: cols }, (_, j) => (places[j] ? dist(c, places[j]) : SANS_PLACE)));
+  const cout = stagiaires.map((c) => Array.from({ length: cols }, (_, j) => (places[j] ? cout1(c, places[j]) : SANS_PLACE)));
   const sol = hongrois(cout);
   return stagiaires.map((c, i) => {
-    const a = places[sol[i]];
+    const trouve = places[sol[i]];
+    const a = trouve && (!c.province || !trouve.province || trouve.province === c.province) ? trouve : undefined; // jamais hors province
     return { candidat_id: c.id, agence_id: a ? a.id : null, distance_km: a ? Math.round(dist(c, a) * 10) / 10 : 0 };
   });
 }
@@ -188,7 +222,7 @@ export function distanceGloutonne(stagiaires: Candidat[], agences: Agence[]): nu
   let total = 0;
   for (const c of stagiaires) {
     const choix = agences
-      .filter((a) => libres[a.id] > 0)
+      .filter((a) => libres[a.id] > 0 && (!c.province || a.province === c.province))
       .map((a) => ({ a, d: dist(c, a) }))
       .sort((x, y) => x.d - y.d)[0];
     if (!choix) continue;
@@ -200,7 +234,7 @@ export function distanceGloutonne(stagiaires: Candidat[], agences: Agence[]): nu
 
 /** Les agences les plus proches d'un candidat, avec distance. */
 export function agencesProches(c: Candidat, agences: Agence[]): { agence: Agence; km: number }[] {
-  return agences.map((a) => ({ agence: a, km: Math.round(dist(c, a) * 10) / 10 })).sort((x, y) => x.km - y.km);
+  return agences.filter((a) => !c.province || !a.province || a.province === c.province).map((a) => ({ agence: a, km: Math.round(dist(c, a) * 10) / 10 })).sort((x, y) => x.km - y.km);
 }
 
 /* ---------- Divers ---------- */
