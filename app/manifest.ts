@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "ELP Hub — Equity Leaders Program",
+    name: "ELP Hub — EquityBCDC",
     short_name: "ELP Hub",
     description: "Suivi du programme ELP : inscriptions, tests, autorisations, induction et stages.",
     start_url: "/",

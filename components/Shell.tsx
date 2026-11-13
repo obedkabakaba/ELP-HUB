@@ -90,7 +90,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <Logo taille={40} />
           <div className="leading-tight">
             <p className="text-[17px] font-extrabold tracking-tight">ELP Hub</p>
-            <p className="text-[11px] text-white/55">Equity Leaders Program</p>
+            <p className="text-[11px] text-white/55">EquityBCDC</p>
           </div>
           <button aria-label="Fermer le menu" className="ml-auto rounded-lg p-1 hover:bg-white/10 lg:hidden" onClick={() => setMenu(false)}>
             <X className="size-5" />

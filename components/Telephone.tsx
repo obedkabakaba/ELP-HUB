@@ -99,7 +99,7 @@ export function Telephone() {
                     <div key={m.id} className="max-w-[70%] self-end rounded-2xl rounded-br-md bg-emerald-600 px-3.5 py-2 text-sm text-white">{m.contenu}</div>
                   ) : (
                     <div key={m.id} className="max-w-[88%] self-start">
-                      <p className="mb-0.5 ml-1 text-[10px] font-bold tracking-wide text-muted uppercase">{m.canal === "whatsapp" ? "WhatsApp · Equity ELP" : "SMS · EquityELP"}</p>
+                      <p className="mb-0.5 ml-1 text-[10px] font-bold tracking-wide text-muted uppercase">{m.canal === "whatsapp" ? "WhatsApp · EquityBCDC" : "SMS · EquityBCDC"}</p>
                       <div className={cx("rounded-2xl rounded-bl-md px-3.5 py-2.5 text-[13px] leading-relaxed", m.statut === "echec" ? "border border-dashed border-rose-300 bg-rose-50 text-rose-800" : "bg-white shadow-sm ring-1 ring-sand-200")}>
                         {m.contenu}
                         {m.lien && m.statut !== "echec" && (

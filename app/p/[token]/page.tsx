@@ -9,7 +9,7 @@ import { Btn, Logo, champ, cx } from "@/components/ui";
 import { parentDemanderCode, parentLire, parentSigner, type VueParent } from "@/lib/parent";
 
 const ENGAGEMENTS = [
-  "J'autorise mon enfant à participer à l'Equity Leaders Program.",
+  "J'autorise mon enfant à participer à l'Equity Leaders Program d'EquityBCDC.",
   "J'autorise mon enfant à séjourner une semaine à l'hôtel pour la formation d'induction, sous la responsabilité des encadreurs.",
   "J'autorise mon enfant à effectuer un stage de deux mois dans une agence EquityBCDC proche de notre domicile.",
   "J'accepte que la Fondation Equity utilise les informations du dossier uniquement pour le programme.",
@@ -50,7 +50,7 @@ export default function PageParent() {
     <div className="min-h-dvh bg-sand-100">
       <BandeauDemo />
       <div className="mx-auto min-h-dvh max-w-md bg-sand-50 shadow-pop">
-        <header className="flex items-center gap-3 border-b border-sand-200 bg-white px-5 py-4"><Logo taille={40} /><div className="leading-tight"><p className="font-extrabold">Autorisation parentale</p><p className="text-xs text-muted">Equity Leaders Program</p></div></header>
+        <header className="flex items-center gap-3 border-b border-sand-200 bg-white px-5 py-4"><Logo taille={40} /><div className="leading-tight"><p className="font-extrabold">Autorisation parentale</p><p className="text-xs text-muted">EquityBCDC · Equity Leaders Program</p></div></header>
         <main className="px-5 py-6">
           {v === undefined ? <p className="py-20 text-center text-sm text-muted">Chargement…</p> : v === null ? (
             <div className="py-16 text-center"><p className="text-lg font-bold">Lien invalide</p><p className="mt-1 text-sm text-muted">Ce lien n&apos;existe pas ou a expiré. Demandez-en un nouveau à l&apos;encadreur de votre enfant.</p></div>
