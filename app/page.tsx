@@ -45,7 +45,7 @@ export default function Accueil() {
               <Logo taille={46} />
               <div className="leading-tight">
                 <p className="text-lg font-extrabold">ELP Hub</p>
-                <p className="text-xs text-white/60">Equity Leaders Program · RDC</p>
+                <p className="text-xs text-white/60">EquityBCDC · Equity Leaders Program</p>
               </div>
             </div>
             <Outils clair />
@@ -118,7 +118,7 @@ export default function Accueil() {
             </div>
           ))}
         </div>
-        <p className="mt-10 text-center text-xs text-muted">Projet étudiant proposé à Equity Group Foundation · maquette de démonstration, non officielle.</p>
+        <p className="mt-10 text-center text-xs text-muted">Projet étudiant proposé à EquityBCDC et à Equity Group Foundation · maquette de démonstration, non officielle.</p>
       </section>
     </div>
   );

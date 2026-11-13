@@ -7,10 +7,18 @@ import { statutInfo, type Statut } from "@/lib/types";
 
 export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
 
+/**
+ * Marque EquityBCDC : le toit du logo officiel et le nom de la banque.
+ * Provisoire : à remplacer par le fichier officiel du logo EquityBCDC
+ * (déposer l'image dans public/brand/ et l'afficher ici).
+ */
 export function Logo({ taille = 44, className }: { taille?: number; className?: string }) {
   return (
-    <span className={cx("inline-grid place-items-center rounded-xl bg-white ring-1 ring-black/5", className)} style={{ width: taille * 1.5, height: taille }}>
-      <Image src="/brand/equity-logo.png" alt="Equity" width={174} height={110} priority style={{ height: taille * 0.78, width: "auto" }} />
+    <span className={cx("inline-flex shrink-0 flex-col items-center justify-center rounded-xl bg-white ring-1 ring-black/5", className)} style={{ height: taille, padding: `0 ${taille * 0.2}px` }} role="img" aria-label="EquityBCDC">
+      <Image src="/brand/toit.png" alt="" width={172} height={61} priority style={{ height: taille * 0.4, width: "auto" }} />
+      <span className="leading-none font-extrabold tracking-tight text-ink" style={{ fontSize: taille * 0.27, marginTop: taille * 0.05 }}>
+        EQUITY<span className="text-brand-600">BCDC</span>
+      </span>
     </span>
   );
 }

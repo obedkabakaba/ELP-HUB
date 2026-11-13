@@ -3,7 +3,7 @@ import "./globals.css";
 import { Providers } from "@/components/Providers";
 
 export const metadata: Metadata = {
-  title: { default: "ELP Hub — Equity Leaders Program", template: "%s · ELP Hub" },
+  title: { default: "ELP Hub — EquityBCDC · Equity Leaders Program", template: "%s · ELP Hub" },
   description: "La plateforme de suivi du programme ELP : un dossier unique par élève, des statuts en temps réel et des relances automatiques.",
   appleWebApp: { capable: true, title: "ELP Hub", statusBarStyle: "default" },
   icons: { apple: "/icons/apple-touch-icon.png" },

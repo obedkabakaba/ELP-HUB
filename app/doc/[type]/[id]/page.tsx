@@ -13,7 +13,7 @@ const ENGAGEMENTS = ["la participation de mon enfant à l'Equity Leaders Program
 function Tete({ titre, sous }: { titre: string; sous: string }) {
   return (
     <div className="flex items-start justify-between border-b-2 border-brand-600 pb-5">
-      <div><p className="text-[11px] font-bold tracking-widest text-brand-600 uppercase">Equity Group Foundation · Equity Leaders Program</p><h1 className="mt-1 text-2xl font-extrabold">{titre}</h1><p className="text-sm text-muted">{sous}</p></div>
+      <div><p className="text-[11px] font-bold tracking-widest text-brand-600 uppercase">EquityBCDC · Equity Leaders Program</p><h1 className="mt-1 text-2xl font-extrabold">{titre}</h1><p className="text-sm text-muted">{sous}</p></div>
       <Logo taille={52} />
     </div>
   );
@@ -96,7 +96,7 @@ export default function Doc() {
       contenu = (
         <div className="feuille flex flex-col text-center">
           <Logo taille={64} className="mx-auto" />
-          <p className="mt-10 text-xs font-bold tracking-[0.3em] text-brand-600 uppercase">Equity Leaders Program</p>
+          <p className="mt-10 text-xs font-bold tracking-[0.3em] text-brand-600 uppercase">EquityBCDC · Equity Leaders Program</p>
           <h1 className="mt-3 text-4xl font-extrabold">Attestation de stage</h1>
           <p className="mt-12 text-muted">Nous attestons que</p>
           <p className="mt-2 text-3xl font-extrabold text-brand-700">{nomComplet(c)}</p>

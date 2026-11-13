@@ -1,6 +1,6 @@
 # ELP Hub
 
-Plateforme de suivi de l'**Equity Leaders Program** (Equity Group Foundation, RDC) : de la liste de l'Exetat jusqu'à la fin du stage en agence EquityBCDC.
+Plateforme de suivi de l'**Equity Leaders Program** d'**EquityBCDC** (programme d'Equity Group Foundation, RDC) : de la liste de l'Exetat jusqu'à la fin du stage en agence EquityBCDC.
 
 > **Maquette de démonstration, non officielle.** Toutes les données sont fictives (200 élèves imaginaires) et aucun vrai SMS n'est envoyé. Aucune donnée réelle ne doit être chargée sans l'accord de la Fondation et du service informatique de la banque.
 
@@ -85,4 +85,4 @@ Le mode démonstration a été testé de bout en bout dans un navigateur. Le mod
 - La liste et les positions des agences sont des **exemples** : à remplacer par la liste officielle.
 - Tarifs des SMS, montant de l'indemnité et programme d'induction sont des valeurs d'exemple.
 - Durée de conservation et consentement des mineurs : à valider avec le service juridique (Code du numérique, 2023).
-- Le logo Equity est utilisé pour la présentation interne du projet ; son usage reste soumis à l'accord de la Fondation.
+- La marque EquityBCDC (toit du logo officiel et nom de la banque) est affichée de façon provisoire, en attendant le fichier officiel du logo ; elle est utilisée pour la présentation interne du projet ; son usage reste soumis à l'accord de la Fondation.

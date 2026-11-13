@@ -10,7 +10,7 @@ export interface Modele {
 }
 
 export const MODELES: Modele[] = [
-  { id: "invitation", nom: "Invitation à s'inscrire", destinataire: "candidat", lien: "inscription", texte: "Félicitations {prenom} ! Avec {pct} % à l'Exetat, tu es présélectionné(e) pour l'Equity Leaders Program. Inscris-toi ici : {lien}" },
+  { id: "invitation", nom: "Invitation à s'inscrire", destinataire: "candidat", lien: "inscription", texte: "Félicitations {prenom} ! Avec {pct} % à l'Exetat, tu es présélectionné(e) pour l'Equity Leaders Program d'EquityBCDC. Inscris-toi ici : {lien}" },
   { id: "relance_inscription", nom: "Relance : inscription non commencée", destinataire: "candidat", lien: "inscription", texte: "{prenom}, ton inscription ELP t'attend encore. Il te faut 10 minutes : {lien}. Besoin d'aide ? Réponds AIDE." },
   { id: "dossier_incomplet", nom: "Relance : dossier incomplet", destinataire: "candidat", lien: "inscription", texte: "{prenom}, il manque à ton dossier ELP : {manquants}. Complète-le ici : {lien}" },
   { id: "convocation", nom: "Convocation au test", destinataire: "candidat", lien: "inscription", texte: "ELP : {prenom}, tu es convoqué(e) au test le {date} à {heure}, {centre}. Présente ton QR code : {lien}. Réponds 1 pour confirmer." },
@@ -20,7 +20,7 @@ export const MODELES: Modele[] = [
   { id: "attente", nom: "Résultat : liste d'attente", destinataire: "candidat", texte: "{prenom}, tu es sur la liste d'attente ELP (rang {rang}). Nous te prévenons dès qu'une place se libère. Garde ton téléphone allumé." },
   { id: "non_retenu", nom: "Résultat : non retenu(e)", destinataire: "candidat", texte: "{prenom}, merci d'avoir participé à la sélection ELP. Tu n'es pas retenu(e) cette année. Ton parcours reste remarquable, continue !" },
   { id: "promotion", nom: "Place libérée (liste d'attente)", destinataire: "candidat", lien: "inscription", texte: "Bonne nouvelle {prenom} ! Une place s'est libérée : tu es sélectionné(e) pour l'ELP {annee}. Détails : {lien}" },
-  { id: "autorisation_parent", nom: "Autorisation parentale à signer", destinataire: "parent", lien: "parent", texte: "Equity Leaders Program : votre enfant {prenom} {nom} est sélectionné(e). Merci de signer l'autorisation parentale ici : {lien}" },
+  { id: "autorisation_parent", nom: "Autorisation parentale à signer", destinataire: "parent", lien: "parent", texte: "EquityBCDC - programme ELP : votre enfant {prenom} {nom} est sélectionné(e). Merci de signer l'autorisation parentale ici : {lien}" },
   { id: "relance_autorisation", nom: "Relance : autorisation non signée", destinataire: "parent", lien: "parent", texte: "Rappel ELP : l'autorisation de {prenom} n'est pas encore signée. Sans elle, {prenom} ne pourra pas participer. 2 minutes suffisent : {lien}" },
   { id: "otp", nom: "Code de signature", destinataire: "parent", texte: "ELP : votre code de signature est {code}. Il est valable 10 minutes. Ne le communiquez à personne." },
   { id: "induction", nom: "Informations induction", destinataire: "candidat", lien: "inscription", texte: "{prenom}, l'induction ELP commence le {date} à {heure}, {centre}. Chambre {chambre}. Prends ta pièce d'identité. Programme : {lien}" },

@@ -75,7 +75,7 @@ export default function Rapports() {
       <div className="feuille rounded-2xl text-[13px]">
         <div className="flex items-start justify-between border-b-2 border-brand-600 pb-5">
           <div>
-            <p className="text-xs font-bold tracking-widest text-brand-600 uppercase">Equity Leaders Program</p>
+            <p className="text-xs font-bold tracking-widest text-brand-600 uppercase">EquityBCDC · Equity Leaders Program</p>
             <h2 className="mt-1 text-2xl font-extrabold">Rapport de suivi</h2>
             <p className="text-muted">{cohorte?.nom} · édité le {new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}</p>
           </div>
