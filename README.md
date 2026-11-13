@@ -1,5 +1,7 @@
 # ELP Hub
 
+> **Installation chez Ardoise (Supabase, e-mails, mise en ligne) : voir [PASSATION-ARDOISE.md](PASSATION-ARDOISE.md).**
+
 Plateforme de suivi de l'**Equity Leaders Program** d'**EquityBCDC** (programme d'Equity Group Foundation, RDC) : de la liste de l'Exetat jusqu'à la fin du stage en agence, puis les chapitres.
 
 > **Maquette de démonstration, non officielle.** Toutes les données sont fictives et aucun vrai e-mail n'est envoyé. Aucune donnée réelle ne doit être chargée sans l'accord de la Fondation et du service informatique de la banque.
